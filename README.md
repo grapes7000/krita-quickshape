@@ -48,7 +48,9 @@ Or run:
 
 ## Current scope
 
-The current code only validates project wiring and a conservative moving-average smoother with fixed endpoints. Read-only 0.1 research rejects Python and identifies a conditional native C++ route, but the interactive proof is blocked by missing development headers, insufficient build disk, and a disconnected Wacom device. It is deliberately not presented as the final smoothing algorithm or a working plugin. Krita integration must not begin until the feasibility gate in `docs/RESEARCH_CHECKLIST.md` is completed.
+The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, and pressure/sensor remapping by normalized arc length. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
+
+Read-only 0.1 research rejects Python and identifies a conditional native C++ route, but the interactive proof is blocked by missing development headers, insufficient build disk, and a disconnected Wacom device. This code is deliberately not presented as a working plugin. Krita integration must not begin until the feasibility gate in `docs/RESEARCH_CHECKLIST.md` is completed.
 
 ## License
 

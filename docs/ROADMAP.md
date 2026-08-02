@@ -22,10 +22,13 @@ native C++ route and rejected Python. Runtime proof remains blocked; see
 
 ## Gate 2 — Geometry core
 
-- Arc-length resampling and deduplication.
-- Corner-aware general smoothing.
-- Pressure/sensor remapping.
-- Unit tests and benchmarks.
+Status: core algorithms implemented and tested. Benchmarks deferred.
+
+- [x] Arc-length resampling and deduplication.
+- [x] Corner-aware general smoothing.
+- [x] Pressure/sensor remapping.
+- [x] Unit tests.
+- [ ] Benchmarks (short, ordinary, and long strokes).
 
 ## Gate 3 — Primitive recognition
 
