@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-build_dir="${project_dir}/build"
+build_dir="${project_dir}/build/core"
 
 if command -v cmake >/dev/null 2>&1; then
     cmake -S "${project_dir}" -B "${build_dir}" -DCMAKE_BUILD_TYPE=Debug

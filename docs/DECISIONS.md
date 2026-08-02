@@ -56,6 +56,66 @@ Do not erase rejected approaches; append dated entries.
   dry runs, and request explicit approval with exact commands, disk cost, and
   duration.
 
+### ADR-004: Retarget Gate 1 exclusively to Krita 5.3.3 Qt5
+
+- Date: 2026-08-02
+- Status: accepted; supersedes the version and capacity assumptions in ADR-002
+  and ADR-003
+- Context: Gate 1 now targets the official 5.3.3 Qt5 AppImage on Ubuntu 26.04
+  XFCE/X11. Krita publishes 5.3.3 and 6.0.3 from the same dual-Qt source.
+- Evidence: the official 6.0.3 `CMakeLists.txt` defaults
+  `BUILD_WITH_QT6=OFF`, reports version 5.3.3 in that branch, and assigns
+  private library ABI 20. The AppImage contains Qt5 and `libkritaui.so.20.0.0`.
+  Its SHA-256 is
+  `1e3fff5da006c0d2600f98a41aa2c9a7dfa49bd931f3640616f30d762db4f743`.
+  The source SHA-256 is
+  `9716b8b9b58d5a7c4cc755380ae2a0ba2298086aed93c63c74f0d69edb63b032`.
+  Both match KDE's Details pages and have good signatures from fingerprint
+  `E9FB29E74ADEACC5E3035B8AB69EB4CF7468332F`.
+- Decision: drop 5.2.2 support. Use 6.0.3 private headers configured for Qt5
+  and load only into the verified 5.3.3 AppImage.
+- Consequences: old untracked 5.2.2 files remain untouched. Existing 5.2.2
+  research is historical evidence, not proof for the new target.
+- Follow-up: establish the exact Qt5/KF5 development package set and compile a
+  registration-only module before implementing paint behavior.
+
+### ADR-005: Keep a version-neutral host boundary
+
+- Date: 2026-08-02
+- Status: accepted
+- Context: the required paint and tool APIs are private and version-coupled.
+- Decision: Qt/Krita types must remain inside a `krita_5_3_3` adapter. Core
+  code exposes stroke lifecycle, sensor samples, active-brush transaction
+  begin/append/end/cancel, and typed interruption reasons.
+- Consequences: future Krita targets add adapters without changing geometry or
+  recognition code. A 600 ms endpoint hold and 2 document-pixel drift limit
+  are named, testable Gate 1 defaults.
+
+### ADR-006: Standalone private-ABI module is viable for Gate 1
+
+- Date: 2026-08-02
+- Status: accepted for continued prototyping; interactive paint proof pending
+- Context: the first experiment needed to show that an out-of-tree tool module
+  can link and register in the official AppImage without installing into Krita.
+- Evidence: the 6.0.3 source configured successfully with
+  `BUILD_WITH_QT6=OFF` using development files isolated under `build/deps/`.
+  `kritaquickshape_krita_5_3_3.so` compiles with private ABI 20, and `ldd -r`
+  resolves it entirely against the AppImage's bundled Krita/Qt5/KF5 libraries
+  without missing symbols. The exact 5.3.3 AppImage, launched with temporary
+  HOME/XDG paths and `KRITA_PLUGIN_PATH`, emitted
+  `QuickShape: registered KritaShape/QuickShapeTool`.
+- Failed experiment: the initial output name
+  `quickshape_krita_5_3_3.so` was skipped because `KoJsonTrader` scans Linux
+  plugin filenames beginning with `krita`. Renaming the output fixed discovery.
+- Decision: continue with the standalone `krita_5_3_3` adapter; do not start a
+  side-by-side Krita build yet.
+- Consequences: registration is compiled and load-tested, not yet visually
+  confirmed in the toolbox. The first 600 ms cancellation/replay slice now
+  compiles, but has not been exercised on a disposable canvas with mouse or pen.
+  CMake reports an RPATH conflict warning because compile-time system Qt/KF
+  imported targets share SONAMEs with bundled libraries; runtime resolution was
+  explicitly checked against the AppImage and remains a release-hardening item.
+
 ## ADR template
 
 ### ADR-NNN: Title

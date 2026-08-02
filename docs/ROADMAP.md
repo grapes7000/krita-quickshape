@@ -2,8 +2,8 @@
 
 ## Gate 0 — Environment and API research
 
-Status: in progress. The 2026-08-01 read-only audit selected a conditional
-native C++ route and rejected Python. Runtime proof remains blocked; see
+Status: in progress. The audit selected a conditional native C++ route,
+retargeted it to Krita 5.3.3 Qt5, and rejected Python. Runtime proof remains blocked; see
 `docs/RESEARCH_REPORT_0.1.md`.
 
 - Record exact OS, session, Krita packaging/version, Qt/KDE versions, tablet path, tools, RAM, and disk.
@@ -12,6 +12,9 @@ native C++ route and rejected Python. Runtime proof remains blocked; see
 - Produce a written go/no-go decision. No large installs or builds without approval.
 
 ## Gate 1 — Feasibility prototype
+
+Target: official `krita-5.3.3-x86_64.AppImage`; matching private headers from
+the 6.0.3 source archive configured in Qt5 mode.
 
 - Capture a tablet stroke and sensor history.
 - Detect end hold without breaking taps or normal strokes.

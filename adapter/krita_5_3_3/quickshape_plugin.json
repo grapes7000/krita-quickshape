@@ -1,0 +1,9 @@
+{
+    "Id": "QuickShape Tool",
+    "Type": "Service",
+    "X-KDE-Library": "quickshape_krita_5_3_3",
+    "X-KDE-ServiceTypes": [
+        "Krita/Tool"
+    ],
+    "X-Krita-Version": "28"
+}

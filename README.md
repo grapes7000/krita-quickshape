@@ -2,7 +2,10 @@
 
 An early-stage, testable project scaffold for a unified Krita drawing tool that cleans wobbly pen strokes, preserves intentional curves and corners, and optionally recognizes geometric shapes while using Krita's currently selected brush preset.
 
-> Status: planning plus a buildable geometry-core skeleton. This repository does **not** yet contain a working Krita plugin. Active-preset brush replay must be proven against the user's installed Krita before integration begins.
+> Status: Gate 1 research plus a buildable host-neutral core. The sole target is
+> the official Krita 5.3.3 Qt5 AppImage, whose matching source is the Krita
+> 6.0.3 dual-Qt source archive built with its default Qt5 mode. This repository
+> does **not** yet contain a compiled or Krita-tested plugin.
 
 ## Intended experience
 
@@ -48,9 +51,9 @@ Or run:
 
 ## Current scope
 
-The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, and pressure/sensor remapping by normalized arc length. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
+The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
 
-Read-only 0.1 research rejects Python and identifies a conditional native C++ route, but the interactive proof is blocked by missing development headers, insufficient build disk, and a disconnected Wacom device. This code is deliberately not presented as a working plugin. Krita integration must not begin until the feasibility gate in `docs/RESEARCH_CHECKLIST.md` is completed.
+Read-only research rejects Python and identifies a conditional native C++ route through a `krita_5_3_3` adapter. The official artifacts are verified and their private API/ABI inspected, but the interactive proof remains blocked by missing matching Qt5/KF5 development headers and a disconnected Wacom device. This code is deliberately not presented as a working plugin.
 
 ## License
 
