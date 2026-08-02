@@ -141,6 +141,24 @@ Do not erase rejected approaches; append dated entries.
   blank with the active preset. Mouse/tablet attribution, sensor coverage,
   cancellation cases, and one-step Undo still require explicit confirmation.
 
+### ADR-008: Replay the corrected geometry through the active paint operation
+
+- Date: 2026-08-02
+- Status: accepted; interactively confirmed
+- Context: the first cancellation/replay proof used a zero-length endpoint
+  path, which correctly removed the rough stroke but could leave no visible
+  mark with the active preset.
+- Decision: deduplicate and arc-length resample the captured stroke, apply
+  corner-aware smoothing, remap pressure and tablet sensors by normalized arc
+  length, then submit every corrected segment to the same active-preset
+  freehand transaction.
+- Evidence: interactive Krita 5.3.3 testing confirmed that a held rough stroke
+  remains visible as a smoother replacement after replay. Automated coverage
+  also verifies tangential-pressure remapping.
+- Consequences: Gate 1 now demonstrates visible corrected-path replay. Exact
+  line, circle, ellipse, polygon, and star snapping remains Gate 3 recognition
+  work rather than part of this general smoothing fallback.
+
 ## ADR template
 
 ### ADR-NNN: Title

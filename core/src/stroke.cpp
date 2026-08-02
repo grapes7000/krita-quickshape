@@ -269,6 +269,7 @@ Stroke remap_sensors(const Stroke& corrected, const Stroke& original) {
         result[i].tilt_x = mapped.tilt_x;
         result[i].tilt_y = mapped.tilt_y;
         result[i].rotation = mapped.rotation;
+        result[i].tangential_pressure = mapped.tangential_pressure;
     }
     return result;
 }

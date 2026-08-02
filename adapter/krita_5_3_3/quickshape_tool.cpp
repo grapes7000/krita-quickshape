@@ -13,6 +13,7 @@
 #include <kundo2magicstring.h>
 #include <KoIcon.h>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -33,24 +34,36 @@ public:
     void cancelRunningStroke() { cancelPaint(); }
     [[nodiscard]] bool hasRunningStroke() const { return isRunning(); }
 
-    bool beginEndpointReplay(const quickshape::Sample& sample,
-                             KisImageWSP image,
-                             KisNodeSP node,
-                             KisStrokesFacade* strokesFacade) {
-        if (!image || !node || !strokesFacade || isRunning()) return false;
+    bool beginCorrectedReplay(const quickshape::Stroke& stroke,
+                              KisImageWSP image,
+                              KisNodeSP node,
+                              KisStrokesFacade* strokesFacade) {
+        if (!image || !node || !strokesFacade || isRunning() ||
+            stroke.empty()) {
+            return false;
+        }
 
-        KisPaintInformation endpoint(
-            QPointF(sample.position.x, sample.position.y),
-            sample.pressure,
-            sample.tilt_x,
-            sample.tilt_y,
-            sample.rotation,
-            sample.tangential_pressure,
-            1.0,
-            0.0,
-            0.0);
-        initPaintImpl(0.0, endpoint, resourceManager(), image, node, strokesFacade);
-        paintLine(endpoint, endpoint);
+        const auto paintInformation = [](const quickshape::Sample& sample) {
+            return KisPaintInformation(
+                QPointF(sample.position.x, sample.position.y),
+                sample.pressure,
+                sample.tilt_x,
+                sample.tilt_y,
+                sample.rotation,
+                sample.tangential_pressure,
+                1.0,
+                static_cast<qreal>(sample.timestamp_us) / 1000.0,
+                0.0);
+        };
+
+        KisPaintInformation previous = paintInformation(stroke.front());
+        initPaintImpl(0.0, previous, resourceManager(), image, node,
+                      strokesFacade);
+        for (std::size_t index = 1; index < stroke.size(); ++index) {
+            KisPaintInformation current = paintInformation(stroke[index]);
+            paintLine(previous, current);
+            previous = current;
+        }
         return isRunning();
     }
 };
@@ -188,13 +201,28 @@ void QuickShapeTool::qualifyEndpointHold() {
         return;
     }
 
-    const quickshape::Sample endpoint = lifecycle_.captured().back();
+    const quickshape::Stroke roughStroke = lifecycle_.captured();
+    const quickshape::Stroke deduplicated = quickshape::deduplicate(
+        roughStroke, {.min_distance = 0.5});
+    const std::size_t replaySampleCount =
+        std::clamp<std::size_t>(deduplicated.size(), 2, 256);
+    const quickshape::Stroke resampled = quickshape::resample_by_arc_length(
+        deduplicated, {.target_count = replaySampleCount});
+    const auto corners = quickshape::detect_corners(
+        resampled, {.angle_threshold_deg = 25.0, .neighborhood = 3});
+    const quickshape::Stroke corrected =
+        quickshape::smooth_positions_preserve_corners(
+            resampled, corners, {.radius = 2});
+    const quickshape::Stroke replayStroke =
+        quickshape::remap_sensors(corrected, roughStroke);
+
     helper_->cancelRunningStroke();
     paintingInformationBuilder()->reset();
-    replacementRunning_ = helper_->beginEndpointReplay(
-        endpoint, image(), currentNode(), image().data());
+    replacementRunning_ = helper_->beginCorrectedReplay(
+        replayStroke, image(), currentNode(), image().data());
     qInfo().noquote() << "QuickShape: replacement replay started"
-                      << replacementRunning_;
+                      << replacementRunning_ << "samples"
+                      << replayStroke.size();
     if (!replacementRunning_) {
         cancelCapture(quickshape::Interruption::replay_failed);
     }
