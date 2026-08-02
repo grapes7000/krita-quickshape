@@ -28,6 +28,7 @@ Corrected strokes must be replayed through Krita's real active brush engine and 
 - `docs/USER_GIT_WORKFLOW.md` — simple Git checklist for the project owner
 - `docs/DECISIONS.md` — architecture decision log
 - `docs/RESEARCH_CHECKLIST.md` — read-only feasibility audit
+- `docs/RESEARCH_REPORT_0.1.md` — exact-version findings and 0.1 build gate
 - `core/` — dependency-free geometry model and initial smoothing API
 - `tests/` — buildable smoke tests
 
@@ -47,7 +48,7 @@ Or run:
 
 ## Current scope
 
-The current code only validates project wiring and a conservative moving-average smoother with fixed endpoints. It is deliberately not presented as the final smoothing algorithm. Krita integration must not begin until the feasibility gate in `docs/RESEARCH_CHECKLIST.md` is completed.
+The current code only validates project wiring and a conservative moving-average smoother with fixed endpoints. Read-only 0.1 research rejects Python and identifies a conditional native C++ route, but the interactive proof is blocked by missing development headers, insufficient build disk, and a disconnected Wacom device. It is deliberately not presented as the final smoothing algorithm or a working plugin. Krita integration must not begin until the feasibility gate in `docs/RESEARCH_CHECKLIST.md` is completed.
 
 ## License
 

@@ -2,6 +2,10 @@
 
 ## Gate 0 — Environment and API research
 
+Status: in progress. The 2026-08-01 read-only audit selected a conditional
+native C++ route and rejected Python. Runtime proof remains blocked; see
+`docs/RESEARCH_REPORT_0.1.md`.
+
 - Record exact OS, session, Krita packaging/version, Qt/KDE versions, tablet path, tools, RAM, and disk.
 - Locate matching official source/API documentation.
 - Identify supported capture, paint replay, preview, transaction, and tool registration points.
