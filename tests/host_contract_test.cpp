@@ -36,7 +36,21 @@ void test_stationary_hold_qualifies() {
     require(lifecycle.append(sample(10.25, 700'000)), "append held endpoint");
     require(lifecycle.phase() == quickshape::StrokePhase::endpoint_held,
             "stationary hold did not change phase");
-    require(lifecycle.begin_replay(), "held stroke did not enter replay");
+    require(lifecycle.begin_replay(700'000),
+            "held stroke did not enter replay");
+}
+
+void test_timer_can_qualify_without_an_extra_pointer_sample() {
+    quickshape::StrokeLifecycle lifecycle;
+    require(lifecycle.begin(sample(0.0, 0)), "begin timer-held stroke");
+    require(lifecycle.append(sample(10.0, 100'000)),
+            "append timer-held endpoint");
+    require(lifecycle.phase() == quickshape::StrokePhase::capturing,
+            "timer-held stroke qualified too early");
+    require(lifecycle.begin_replay(700'000),
+            "timer could not atomically qualify and enter replay");
+    require(lifecycle.phase() == quickshape::StrokePhase::replaying,
+            "timer-held stroke did not enter replay phase");
 }
 
 void test_hold_does_not_require_sample_at_exact_cutoff() {
@@ -74,6 +88,7 @@ void test_interruption_clears_capture() {
 int main() {
     test_immediate_lift_does_not_qualify();
     test_stationary_hold_qualifies();
+    test_timer_can_qualify_without_an_extra_pointer_sample();
     test_hold_does_not_require_sample_at_exact_cutoff();
     test_drift_rejects_hold();
     test_interruption_clears_capture();

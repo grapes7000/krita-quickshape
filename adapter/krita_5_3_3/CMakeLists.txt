@@ -67,5 +67,7 @@ target_link_libraries(quickshape_krita_5_3_3 PRIVATE
 set_target_properties(quickshape_krita_5_3_3 PROPERTIES
     PREFIX ""
     OUTPUT_NAME "kritaquickshape_krita_5_3_3"
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
     BUILD_RPATH "${KRITA_APPDIR}/lib"
 )

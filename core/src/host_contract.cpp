@@ -45,8 +45,12 @@ bool StrokeLifecycle::hold_qualifies(std::int64_t now_us) const {
            now_us - first_stationary->timestamp_us >= duration_us;
 }
 
-bool StrokeLifecycle::begin_replay() {
-    if (phase_ != StrokePhase::endpoint_held) return false;
+bool StrokeLifecycle::begin_replay(std::int64_t now_us) {
+    if ((phase_ != StrokePhase::capturing &&
+         phase_ != StrokePhase::endpoint_held) ||
+        !hold_qualifies(now_us)) {
+        return false;
+    }
     phase_ = StrokePhase::replaying;
     return true;
 }

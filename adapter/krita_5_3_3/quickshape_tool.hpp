@@ -39,6 +39,7 @@ private:
     QTimer holdTimer_;
     quickshape::Point holdAnchor_{};
     bool replacementRunning_{false};
+    bool inputCancelled_{false};
 };
 
 class QuickShapeToolFactory final : public KisToolPaintFactoryBase {

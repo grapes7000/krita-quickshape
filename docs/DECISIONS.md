@@ -116,6 +116,31 @@ Do not erase rejected approaches; append dated entries.
   imported targets share SONAMEs with bundled libraries; runtime resolution was
   explicitly checked against the AppImage and remains a release-hardening item.
 
+### ADR-007: Preserve bundled plugins and trust the live freehand transaction
+
+- Date: 2026-08-02
+- Status: accepted for interactive Gate 1 testing
+- Context: setting `KRITA_PLUGIN_PATH` to a directory containing only
+  QuickShape disabled Krita's bundled resource and canvas plugins. In the
+  5.3.3 AppImage, `KisToolFreehand::beginPrimaryAction()` can also leave the
+  public tool mode at hover while its private freehand helper owns a live paint
+  transaction, causing inherited motion and pen-up handlers to discard input.
+- Evidence: an overlay containing all 170 bundled plugins plus QuickShape
+  restores normal startup. Instrumentation then reported `mode 0` together
+  with `transaction true` for every pen-down event.
+- Decision: the isolated launcher constructs a complete plugin overlay and
+  uses software OpenGL. The adapter treats the helper's running stroke as the
+  authoritative lifecycle state and invokes the protected stroke append/end
+  operations while that transaction is live. Private inline symbols are
+  hidden so only Qt's two plugin entry points are exported.
+- Consequences: startup no longer loses Krita resources, and pointer motion is
+  delivered to the real active-preset paint operation despite the public mode
+  mismatch. Interactive testing confirmed ordinary rough strokes and confirmed
+  that a qualifying stationary hold cancels the rough stroke and starts the
+  endpoint replacement. The zero-length Gate 1 placeholder can be visually
+  blank with the active preset. Mouse/tablet attribution, sensor coverage,
+  cancellation cases, and one-step Undo still require explicit confirmation.
+
 ## ADR template
 
 ### ADR-NNN: Title

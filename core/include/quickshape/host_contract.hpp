@@ -50,7 +50,7 @@ public:
     [[nodiscard]] bool begin(const Sample& sample);
     [[nodiscard]] bool append(const Sample& sample);
     [[nodiscard]] bool hold_qualifies(std::int64_t now_us) const;
-    [[nodiscard]] bool begin_replay();
+    [[nodiscard]] bool begin_replay(std::int64_t now_us);
     void finish() noexcept;
     void interrupt(Interruption reason) noexcept;
 

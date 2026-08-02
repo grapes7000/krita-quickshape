@@ -2,6 +2,7 @@
 
 #include <KoCanvasBase.h>
 #include <KoPointerEvent.h>
+#include <QDebug>
 #include <KisViewManager.h>
 #include <kis_canvas2.h>
 #include <kis_cursor.h>
@@ -16,6 +17,7 @@
 
 namespace {
 constexpr int kEndpointHoldMilliseconds = 600;
+constexpr int kHoldRecheckMilliseconds = 50;
 constexpr double kMaximumEndpointDriftPixels = 2.0;
 }
 
@@ -29,6 +31,7 @@ public:
                                 new KisSmoothingOptions(false)) {}
 
     void cancelRunningStroke() { cancelPaint(); }
+    [[nodiscard]] bool hasRunningStroke() const { return isRunning(); }
 
     bool beginEndpointReplay(const quickshape::Sample& sample,
                              KisImageWSP image,
@@ -57,14 +60,17 @@ QuickShapeTool::QuickShapeTool(KoCanvasBase* canvas)
                       KisCursor::load("tool_freehand_cursor.xpm", 2, 2),
                       kundo2_i18n("QuickShape Stroke"),
                       false) {
+    qInfo().noquote() << "QuickShape: constructing tool";
     setObjectName("quickshape_tool");
     helper_ = new FreehandHelper(paintingInformationBuilder(),
                                  canvas->resourceManager());
     resetHelper(helper_);
+    qInfo().noquote() << "QuickShape: installed freehand helper";
     holdTimer_.setSingleShot(true);
     holdTimer_.setInterval(kEndpointHoldMilliseconds);
     connect(&holdTimer_, &QTimer::timeout,
             this, &QuickShapeTool::qualifyEndpointHold);
+    qInfo().noquote() << "QuickShape: tool construction complete";
 }
 
 quickshape::Sample QuickShapeTool::sampleFromEvent(
@@ -84,6 +90,15 @@ quickshape::Sample QuickShapeTool::sampleFromEvent(
 }
 
 void QuickShapeTool::beginPrimaryAction(KoPointerEvent* event) {
+    qInfo().noquote() << "QuickShape: begin input at" << event->point
+                      << "pressure" << event->pressure();
+    if (helper_->hasRunningStroke()) {
+        qWarning().noquote()
+            << "QuickShape: cancelling stale transaction before new stroke";
+        helper_->cancelRunningStroke();
+        paintingInformationBuilder()->reset();
+    }
+
     strokeClock_.restart();
     const auto sample = sampleFromEvent(event);
     lifecycle_.finish();
@@ -91,9 +106,13 @@ void QuickShapeTool::beginPrimaryAction(KoPointerEvent* event) {
     KIS_SAFE_ASSERT_RECOVER_RETURN(captureStarted);
     holdAnchor_ = sample.position;
     replacementRunning_ = false;
+    inputCancelled_ = false;
 
     KisToolFreehand::beginPrimaryAction(event);
-    if (mode() == KisTool::PAINT_MODE) {
+    qInfo().noquote() << "QuickShape: begin result mode" << int(mode())
+                      << "transaction" << helper_->hasRunningStroke();
+    if (helper_->hasRunningStroke()) {
+        holdTimer_.setInterval(kEndpointHoldMilliseconds);
         holdTimer_.start();
     } else {
         lifecycle_.interrupt(quickshape::Interruption::unsupported_node);
@@ -101,20 +120,41 @@ void QuickShapeTool::beginPrimaryAction(KoPointerEvent* event) {
 }
 
 void QuickShapeTool::continuePrimaryAction(KoPointerEvent* event) {
-    if (replacementRunning_) return;
+    if (replacementRunning_ || inputCancelled_ ||
+        !helper_->hasRunningStroke()) {
+        return;
+    }
 
-    KisToolFreehand::continuePrimaryAction(event);
     const auto sample = sampleFromEvent(event);
     const bool sampleAppended = lifecycle_.append(sample);
-    KIS_SAFE_ASSERT_RECOVER_RETURN(sampleAppended);
+    if (!sampleAppended) {
+        cancelCapture(quickshape::Interruption::replay_failed);
+        return;
+    }
     restartHoldTimer(sample);
+    doStroke(event);
 }
 
 void QuickShapeTool::endPrimaryAction(KoPointerEvent* event) {
+    Q_UNUSED(event);
+    qInfo().noquote() << "QuickShape: end input mode" << int(mode())
+                      << "transaction" << helper_->hasRunningStroke();
     holdTimer_.stop();
-    KisToolFreehand::endPrimaryAction(event);
+    if (!inputCancelled_ && helper_->hasRunningStroke()) {
+        // The AppImage resets the public tool mode even while the private
+        // freehand helper owns a live stroke. Its stroke id is authoritative.
+        endStroke();
+        if (auto* canvas2 = dynamic_cast<KisCanvas2*>(canvas())) {
+            canvas2->viewManager()->enableControls();
+        }
+        setMode(KisTool::HOVER_MODE);
+    } else if (inputCancelled_ && helper_->hasRunningStroke()) {
+        helper_->cancelRunningStroke();
+        paintingInformationBuilder()->reset();
+    }
     lifecycle_.finish();
     replacementRunning_ = false;
+    inputCancelled_ = false;
 }
 
 void QuickShapeTool::restartHoldTimer(const quickshape::Sample& sample) {
@@ -122,14 +162,29 @@ void QuickShapeTool::restartHoldTimer(const quickshape::Sample& sample) {
     const double dy = sample.position.y - holdAnchor_.y;
     if (std::hypot(dx, dy) > kMaximumEndpointDriftPixels) {
         holdAnchor_ = sample.position;
+        holdTimer_.setInterval(kEndpointHoldMilliseconds);
         holdTimer_.start();
     }
 }
 
 void QuickShapeTool::qualifyEndpointHold() {
-    if (mode() != KisTool::PAINT_MODE || replacementRunning_ ||
-        !lifecycle_.hold_qualifies(strokeClock_.nsecsElapsed() / 1000) ||
-        !lifecycle_.begin_replay()) {
+    const auto nowUs = strokeClock_.nsecsElapsed() / 1000;
+    const bool holdQualified = lifecycle_.hold_qualifies(nowUs);
+    qInfo().noquote() << "QuickShape: hold timer fired after" << nowUs
+                      << "us; qualified" << holdQualified
+                      << "transaction" << helper_->hasRunningStroke();
+    if (!helper_->hasRunningStroke() || replacementRunning_) {
+        return;
+    }
+    if (!holdQualified) {
+        // The timer anchor and the lifecycle's rolling endpoint window can
+        // differ after small sub-threshold moves. Recheck while the stroke is
+        // live instead of requiring another pointer event to arm the timer.
+        holdTimer_.setInterval(kHoldRecheckMilliseconds);
+        holdTimer_.start();
+        return;
+    }
+    if (!lifecycle_.begin_replay(nowUs)) {
         return;
     }
 
@@ -138,6 +193,8 @@ void QuickShapeTool::qualifyEndpointHold() {
     paintingInformationBuilder()->reset();
     replacementRunning_ = helper_->beginEndpointReplay(
         endpoint, image(), currentNode(), image().data());
+    qInfo().noquote() << "QuickShape: replacement replay started"
+                      << replacementRunning_;
     if (!replacementRunning_) {
         cancelCapture(quickshape::Interruption::replay_failed);
     }
@@ -148,6 +205,7 @@ void QuickShapeTool::cancelCapture(quickshape::Interruption reason) {
     helper_->cancelRunningStroke();
     paintingInformationBuilder()->reset();
     replacementRunning_ = false;
+    inputCancelled_ = true;
     lifecycle_.interrupt(reason);
     setMode(KisTool::HOVER_MODE);
 
@@ -157,19 +215,19 @@ void QuickShapeTool::cancelCapture(quickshape::Interruption reason) {
 }
 
 void QuickShapeTool::requestStrokeCancellation() {
-    if (mode() == KisTool::PAINT_MODE) {
+    if (helper_->hasRunningStroke()) {
         cancelCapture(quickshape::Interruption::escape);
     }
 }
 
 void QuickShapeTool::requestStrokeEnd() {
-    if (mode() == KisTool::PAINT_MODE) {
+    if (helper_->hasRunningStroke()) {
         cancelCapture(quickshape::Interruption::node_changed);
     }
 }
 
 void QuickShapeTool::deactivate() {
-    if (mode() == KisTool::PAINT_MODE) {
+    if (helper_->hasRunningStroke()) {
         cancelCapture(quickshape::Interruption::tool_deactivated);
     }
     KisToolFreehand::deactivate();
@@ -179,8 +237,8 @@ QuickShapeToolFactory::QuickShapeToolFactory()
     : KisToolPaintFactoryBase("KritaShape/QuickShapeTool") {
     setToolTip(i18n("QuickShape Tool"));
     setSection(ToolBoxSection::Shape);
-    setIconName(koIconNameCStr("krita_tool_freehand"));
-    setPriority(11);
+    setIconName(koIconNameCStr("krita_tool_line"));
+    setPriority(50);
     setActivationShapeId(KRITA_TOOL_ACTIVATION_ID);
 }
 
