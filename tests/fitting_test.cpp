@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 
@@ -90,6 +91,30 @@ quickshape::Stroke make_triangle(double cx, double cy, double r,
                        static_cast<double>(per_side);
             s.push_back(make_sample(a.x + t * (b.x - a.x),
                                     a.y + t * (b.y - a.y)));
+        }
+    }
+    s.push_back(s.front());
+    return s;
+}
+
+quickshape::Stroke make_star(double cx, double cy, double outer_r,
+                              double inner_r, double rotation,
+                              std::size_t per_edge, double jitter = 0.0) {
+    quickshape::Stroke s;
+    std::vector<quickshape::Point> verts;
+    for (int i = 0; i < 10; ++i) {
+        double angle = rotation + static_cast<double>(i) * 2.0 * M_PI / 10.0;
+        double r = (i % 2 == 0) ? outer_r : inner_r;
+        verts.push_back({cx + r * std::cos(angle), cy + r * std::sin(angle)});
+    }
+    for (std::size_t i = 0; i < 10; ++i) {
+        auto& a = verts[i];
+        auto& b = verts[(i + 1) % 10];
+        for (std::size_t j = 0; j < per_edge; ++j) {
+            double t = static_cast<double>(j) / static_cast<double>(per_edge);
+            double noise = jitter * (static_cast<double>((i * per_edge + j) % 5) - 2.0) / 2.0;
+            s.push_back(make_sample(a.x + t * (b.x - a.x) + noise,
+                                    a.y + t * (b.y - a.y) + noise));
         }
     }
     s.push_back(s.front());
@@ -201,6 +226,66 @@ void test_classify_fallback() {
             "classify_fallback: chaotic stroke was classified");
 }
 
+void test_fit_star() {
+    auto star = make_star(50, 50, 40, 18, 0.0, 12);
+    auto sf = quickshape::fit_star(star);
+    require(sf.residual < std::numeric_limits<double>::max(),
+            "fit_star: residual is max (rejected)");
+    require(close(sf.center.x, 50, 3), "fit_star: center.x off");
+    require(close(sf.center.y, 50, 3), "fit_star: center.y off");
+    require(close(sf.outer_radius, 40, 5), "fit_star: outer_radius off");
+    require(close(sf.inner_radius, 18, 5), "fit_star: inner_radius off");
+}
+
+void test_fit_star_rotated() {
+    auto star = make_star(100, 100, 50, 22, M_PI / 5.0, 15);
+    auto sf = quickshape::fit_star(star);
+    require(sf.residual < std::numeric_limits<double>::max(),
+            "fit_star_rot: rejected");
+    require(close(sf.outer_radius, 50, 6), "fit_star_rot: outer off");
+    require(close(sf.inner_radius, 22, 6), "fit_star_rot: inner off");
+}
+
+void test_fit_star_with_jitter() {
+    auto star = make_star(50, 50, 40, 18, 0.0, 12, 1.5);
+    auto sf = quickshape::fit_star(star);
+    require(sf.residual < std::numeric_limits<double>::max(),
+            "fit_star_jitter: rejected");
+    require(close(sf.center.x, 50, 5), "fit_star_jitter: center.x off");
+    require(close(sf.center.y, 50, 5), "fit_star_jitter: center.y off");
+}
+
+void test_classify_star() {
+    auto star = make_star(50, 50, 40, 18, 0.0, 15);
+    auto result = quickshape::classify(star, {.confidence_threshold = 0.3});
+    require(result.type == quickshape::ShapeType::Star,
+            "classify_star: not recognized as star");
+    require(result.confidence > 0.3, "classify_star: low confidence");
+}
+
+void test_star_reject_non_star() {
+    // A circle should not be classified as a star
+    auto circle = make_circle(50, 50, 30, 60);
+    auto sf = quickshape::fit_star(circle);
+    // Should either reject (max residual) or have very high residual
+    bool rejected = sf.residual >= std::numeric_limits<double>::max() ||
+                    sf.residual > 5.0;
+    require(rejected, "star_reject: circle accepted as star");
+}
+
+void test_stroke_from_star() {
+    quickshape::StarFit sf;
+    sf.center = {50, 50};
+    sf.outer_radius = 40;
+    sf.inner_radius = 18;
+    sf.rotation_rad = 0;
+    auto stroke = quickshape::stroke_from_star(sf, 6);
+    require(stroke.size() > 40, "stroke_from_star: too few samples");
+    // First point should be on the outer radius
+    double r0 = quickshape::distance(stroke[0].position, sf.center);
+    require(close(r0, 40, 1), "stroke_from_star: first point not at outer radius");
+}
+
 void test_stroke_generation() {
     auto line_stroke = quickshape::stroke_from_line(
         {{0, 0}, {10, 10}, 0}, 10);
@@ -233,6 +318,12 @@ int main() {
     test_classify_circle();
     test_classify_rectangle();
     test_classify_fallback();
+    test_fit_star();
+    test_fit_star_rotated();
+    test_fit_star_with_jitter();
+    test_classify_star();
+    test_star_reject_non_star();
+    test_stroke_from_star();
     test_stroke_generation();
 
     if (g_failures > 0) {

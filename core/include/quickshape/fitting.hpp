@@ -15,6 +15,7 @@ enum class ShapeType : std::uint8_t {
     Triangle,
     Rectangle,
     Polygon,
+    Star,
 };
 
 struct LineFit {
@@ -42,6 +43,14 @@ struct PolygonFit {
     double residual{};
 };
 
+struct StarFit {
+    Point center{};
+    double outer_radius{};
+    double inner_radius{};
+    double rotation_rad{};
+    double residual{};
+};
+
 struct ClassifyOptions {
     double confidence_threshold{0.85};
     double closure_distance_ratio{0.10};
@@ -56,6 +65,7 @@ struct ClassifyResult {
     CircleFit circle;
     EllipseFit ellipse;
     PolygonFit polygon;
+    StarFit star;
     Stroke fitted_path;
 };
 
@@ -64,6 +74,7 @@ struct ClassifyResult {
 [[nodiscard]] LineFit fit_line(const Stroke& input);
 [[nodiscard]] CircleFit fit_circle(const Stroke& input);
 [[nodiscard]] EllipseFit fit_ellipse(const Stroke& input);
+[[nodiscard]] StarFit fit_star(const Stroke& input);
 
 // --- Polygon helpers ---
 
@@ -82,6 +93,8 @@ struct ClassifyResult {
                                          std::size_t sample_count);
 [[nodiscard]] Stroke stroke_from_polygon(const PolygonFit& fit,
                                           std::size_t samples_per_edge);
+[[nodiscard]] Stroke stroke_from_star(const StarFit& fit,
+                                      std::size_t samples_per_edge);
 
 // --- Classifier ---
 

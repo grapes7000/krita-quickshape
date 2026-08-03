@@ -46,9 +46,12 @@ Status: implemented and tested. Star recognition deferred to Gate 4.
 
 ## Gate 4 — Five-point stars
 
-- Detect outer and inner radial extrema.
-- Preserve rotation and proportions.
-- Reject ambiguous or non-five-point contours.
+Status: implemented and tested.
+
+- [x] Detect outer and inner radial extrema.
+- [x] Preserve rotation and proportions.
+- [x] Reject ambiguous or non-five-point contours.
+- [x] Dual detection path: direct extrema analysis and polygon-vertex pattern matching.
 
 ## Gate 5 — Product integration
 

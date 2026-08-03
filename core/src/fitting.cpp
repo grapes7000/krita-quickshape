@@ -287,6 +287,165 @@ EllipseFit fit_ellipse(const Stroke& input) {
     return result;
 }
 
+// --- Five-point star fitting ---
+
+StarFit fit_star(const Stroke& input) {
+    StarFit result;
+    if (input.size() < 10) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    // Remove the closing duplicate if present
+    Stroke samples = input;
+    if (samples.size() >= 2 &&
+        distance(samples.front().position, samples.back().position) < 1e-6) {
+        samples.pop_back();
+    }
+    if (samples.size() < 10) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    Point c = centroid(samples);
+    result.center = c;
+
+    // Compute polar angles and radii relative to centroid
+    struct PolarSample {
+        double angle;
+        double radius;
+    };
+    std::vector<PolarSample> polar;
+    polar.reserve(samples.size());
+    for (const auto& s : samples) {
+        double dx = s.position.x - c.x;
+        double dy = s.position.y - c.y;
+        double r = std::sqrt(dx * dx + dy * dy);
+        double a = std::atan2(dy, dx);
+        polar.push_back({a, r});
+    }
+
+    // Find radial extrema (local maxima and minima)
+    struct Extremum {
+        double angle;
+        double radius;
+        bool is_max;
+    };
+    std::vector<Extremum> extrema;
+    const std::size_t win = std::max<std::size_t>(input.size() / 20, 2);
+    for (std::size_t i = 0; i < polar.size(); ++i) {
+        bool is_local_max = true;
+        bool is_local_min = true;
+        for (std::size_t j = 1; j <= win; ++j) {
+            std::size_t prev = (i + polar.size() - j) % polar.size();
+            std::size_t next = (i + j) % polar.size();
+            if (polar[prev].radius >= polar[i].radius ||
+                polar[next].radius >= polar[i].radius) {
+                is_local_max = false;
+            }
+            if (polar[prev].radius <= polar[i].radius ||
+                polar[next].radius <= polar[i].radius) {
+                is_local_min = false;
+            }
+        }
+        if (is_local_max)
+            extrema.push_back({polar[i].angle, polar[i].radius, true});
+        if (is_local_min)
+            extrema.push_back({polar[i].angle, polar[i].radius, false});
+    }
+
+    // Merge nearby extrema of the same type
+    std::sort(extrema.begin(), extrema.end(),
+              [](const Extremum& a, const Extremum& b) {
+                  return a.angle < b.angle;
+              });
+
+    std::vector<Extremum> merged;
+    for (const auto& e : extrema) {
+        if (!merged.empty() && merged.back().is_max == e.is_max &&
+            std::abs(e.angle - merged.back().angle) < M_PI / 8.0) {
+            if ((e.is_max && e.radius > merged.back().radius) ||
+                (!e.is_max && e.radius < merged.back().radius)) {
+                merged.back() = e;
+            }
+        } else {
+            merged.push_back(e);
+        }
+    }
+
+    // Count peaks and valleys
+    std::size_t peaks = 0, valleys = 0;
+    for (const auto& e : merged) {
+        if (e.is_max) ++peaks;
+        else ++valleys;
+    }
+
+    // A five-point star must have exactly 5 peaks and 5 valleys
+    if (peaks != 5 || valleys != 5) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    // Compute outer (peak) and inner (valley) radii
+    double outer_sum = 0, inner_sum = 0;
+    double first_peak_angle = 0;
+    bool found_first_peak = false;
+    for (const auto& e : merged) {
+        if (e.is_max) {
+            outer_sum += e.radius;
+            if (!found_first_peak) {
+                first_peak_angle = e.angle;
+                found_first_peak = true;
+            }
+        } else {
+            inner_sum += e.radius;
+        }
+    }
+    result.outer_radius = outer_sum / 5.0;
+    result.inner_radius = inner_sum / 5.0;
+    result.rotation_rad = first_peak_angle;
+
+    // Reject if inner/outer ratio is unreasonable for a star
+    double ratio = result.inner_radius / result.outer_radius;
+    if (ratio > 0.85 || ratio < 0.1) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    // Compute residual: distance from each sample to the ideal star outline
+    auto ideal_star_radius = [&](double angle) -> double {
+        double rel = angle - result.rotation_rad;
+        // Normalize to [0, 2π)
+        rel = std::fmod(rel, 2.0 * M_PI);
+        if (rel < 0) rel += 2.0 * M_PI;
+        // Each star sector is 2π/10 = 36°
+        double sector = 2.0 * M_PI / 10.0;
+        double within = std::fmod(rel, sector);
+        double frac = within / sector;
+        // Interpolate between outer and inner
+        std::size_t sector_idx =
+            static_cast<std::size_t>(rel / sector) % 10;
+        if (sector_idx % 2 == 0) {
+            // From outer peak to inner valley
+            return result.outer_radius +
+                   frac * (result.inner_radius - result.outer_radius);
+        } else {
+            // From inner valley to outer peak
+            return result.inner_radius +
+                   frac * (result.outer_radius - result.inner_radius);
+        }
+    };
+
+    double err_sum = 0;
+    for (const auto& p : polar) {
+        double expected_r = ideal_star_radius(p.angle);
+        err_sum += std::abs(p.radius - expected_r);
+    }
+    result.residual = err_sum / static_cast<double>(samples.size());
+
+    return result;
+}
+
 // --- RDP simplification ---
 
 namespace {
@@ -434,6 +593,39 @@ Stroke stroke_from_polygon(const PolygonFit& fit,
     return s;
 }
 
+Stroke stroke_from_star(const StarFit& fit, std::size_t samples_per_edge) {
+    Stroke s;
+    if (samples_per_edge < 2) samples_per_edge = 6;
+
+    // Generate 10 vertices alternating outer/inner
+    std::vector<Point> verts;
+    verts.reserve(10);
+    for (int i = 0; i < 10; ++i) {
+        double angle = fit.rotation_rad +
+                       static_cast<double>(i) * 2.0 * M_PI / 10.0;
+        double r = (i % 2 == 0) ? fit.outer_radius : fit.inner_radius;
+        verts.push_back({fit.center.x + r * std::cos(angle),
+                         fit.center.y + r * std::sin(angle)});
+    }
+
+    // Connect vertices with interpolated samples
+    for (std::size_t i = 0; i < 10; ++i) {
+        const auto& a = verts[i];
+        const auto& b = verts[(i + 1) % 10];
+        std::size_t start_idx = (i == 0) ? 0 : 1;
+        for (std::size_t j = start_idx; j < samples_per_edge; ++j) {
+            double t = static_cast<double>(j) /
+                       static_cast<double>(samples_per_edge - 1);
+            Sample sam;
+            sam.position.x = a.x + t * (b.x - a.x);
+            sam.position.y = a.y + t * (b.y - a.y);
+            s.push_back(sam);
+        }
+    }
+
+    return s;
+}
+
 // --- Classifier ---
 
 ClassifyResult classify(const Stroke& input, const ClassifyOptions& options) {
@@ -500,6 +692,20 @@ ClassifyResult classify(const Stroke& input, const ClassifyOptions& options) {
         }
     }
 
+    // Five-point star (closed strokes)
+    if (closed) {
+        auto sf = fit_star(input);
+        if (sf.residual < std::numeric_limits<double>::max()) {
+            double conf = score(sf.residual);
+            if (conf > best.confidence) {
+                best.type = ShapeType::Star;
+                best.confidence = conf;
+                best.star = sf;
+                best.fitted_path = stroke_from_star(sf, input.size() / 10 + 1);
+            }
+        }
+    }
+
     // Polygon (closed strokes)
     if (closed) {
         auto pf = fit_polygon(input, epsilon);
@@ -529,12 +735,55 @@ ClassifyResult classify(const Stroke& input, const ClassifyOptions& options) {
                 if (is_rect) poly_type = ShapeType::Rectangle;
             }
 
+            // Detect five-point star: 10 vertices with alternating radii
+            if (nv == 10) {
+                Point pc = centroid(input);
+                double outer_sum = 0, inner_sum = 0;
+                bool alternates = true;
+                for (std::size_t vi = 0; vi < 10; ++vi) {
+                    double r = distance(pf.vertices[vi], pc);
+                    if (vi % 2 == 0)
+                        outer_sum += r;
+                    else
+                        inner_sum += r;
+                }
+                double mean_outer = outer_sum / 5.0;
+                double mean_inner = inner_sum / 5.0;
+                if (mean_outer > 1e-6 && mean_inner > 1e-6) {
+                    double ratio = mean_inner / mean_outer;
+                    for (std::size_t vi = 0; vi < 10 && alternates; ++vi) {
+                        double r = distance(pf.vertices[vi], pc);
+                        double expected =
+                            (vi % 2 == 0) ? mean_outer : mean_inner;
+                        if (std::abs(r - expected) / mean_outer > 0.25)
+                            alternates = false;
+                    }
+                    if (alternates && ratio > 0.1 && ratio < 0.85) {
+                        poly_type = ShapeType::Star;
+                        // Fill in star fit from polygon vertices
+                        best.star.center = pc;
+                        best.star.outer_radius = mean_outer;
+                        best.star.inner_radius = mean_inner;
+                        best.star.rotation_rad = std::atan2(
+                            pf.vertices[0].y - pc.y,
+                            pf.vertices[0].x - pc.x);
+                        best.star.residual = pf.residual;
+                    }
+                }
+            }
+
             if (conf > best.confidence) {
                 best.type = poly_type;
                 best.confidence = conf;
                 best.polygon = pf;
-                best.fitted_path =
-                    stroke_from_polygon(pf, input.size() / nv + 1);
+                if (poly_type == ShapeType::Star) {
+                    best.fitted_path =
+                        stroke_from_star(best.star,
+                                         input.size() / 10 + 1);
+                } else {
+                    best.fitted_path =
+                        stroke_from_polygon(pf, input.size() / nv + 1);
+                }
             }
         }
     }
