@@ -2,9 +2,8 @@
 
 ## Gate 0 — Environment and API research
 
-Status: in progress. The audit selected a conditional native C++ route,
-retargeted it to Krita 5.3.3 Qt5, and rejected Python. Runtime proof remains blocked; see
-`docs/RESEARCH_REPORT_0.1.md`.
+Status: complete. The audit selected a native C++ route targeting Krita 5.3.3
+Qt5 and rejected Python. See `docs/RESEARCH_REPORT_0.1.md`.
 
 - Record exact OS, session, Krita packaging/version, Qt/KDE versions, tablet path, tools, RAM, and disk.
 - Locate matching official source/API documentation.
@@ -55,10 +54,20 @@ Status: implemented and tested.
 
 ## Gate 5 — Product integration
 
-- Single canvas tool and Tool Options.
-- Preview/adjustment behavior.
-- Persistent settings and bypass modifier.
-- Safe unsupported-layer and cancellation handling.
+Status: in progress. The `krita_5_3_3` adapter loads into the AppImage, captures
+strokes, detects holds, cancels rough strokes, and replays corrected paths
+through the active brush preset. Currently debugging and optimizing the
+correction flow. Shape recognition integration (Gates 3/4) in progress.
+
+- [x] Tool registers and loads in Krita 5.3.3 AppImage.
+- [x] Stroke capture, hold detection, and cancellation working.
+- [x] Corrected-path replay through active brush preset.
+- [ ] Shape recognition integration (line, circle, ellipse, polygon, star).
+- [ ] Tool Options panel.
+- [ ] Preview/adjustment behavior.
+- [ ] Persistent settings and bypass modifier.
+- [ ] Safe unsupported-layer and cancellation edge cases.
+- [ ] One-step Undo verification.
 
 ## Gate 6 — Packaging
 

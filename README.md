@@ -2,10 +2,11 @@
 
 An early-stage, testable project scaffold for a unified Krita drawing tool that cleans wobbly pen strokes, preserves intentional curves and corners, and optionally recognizes geometric shapes while using Krita's currently selected brush preset.
 
-> Status: Gate 1 research plus a buildable host-neutral core. The sole target is
-> the official Krita 5.3.3 Qt5 AppImage, whose matching source is the Krita
-> 6.0.3 dual-Qt source archive built with its default Qt5 mode. This repository
-> does **not** yet contain a compiled or Krita-tested plugin.
+> Status: semi-working Krita tool, actively debugging and optimizing. The sole
+> target is the official Krita 5.3.3 Qt5 AppImage, whose matching source is the
+> Krita 6.0.3 dual-Qt source archive built with its default Qt5 mode. The tool
+> loads into Krita and performs basic stroke correction; shape recognition
+> integration is in progress.
 
 ## Intended experience
 
@@ -53,7 +54,7 @@ Or run:
 
 The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
 
-Read-only research rejects Python and identifies a conditional native C++ route through a `krita_5_3_3` adapter. The official artifacts are verified and their private API/ABI inspected, but the interactive proof remains blocked by missing matching Qt5/KF5 development headers and a disconnected Wacom device. This code is deliberately not presented as a working plugin.
+The `krita_5_3_3` adapter loads into the official Krita 5.3.3 AppImage and performs stroke capture, hold detection, cancellation, and corrected-path replay through the active brush preset. Shape recognition (Gate 3/4) is implemented in the core and being integrated into the live tool. Currently debugging and optimizing the correction flow.
 
 ## License
 

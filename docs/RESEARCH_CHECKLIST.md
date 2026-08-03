@@ -29,12 +29,12 @@ Matching-source evidence exists for the internal native route, but none of
 these are checked until the corresponding behavior is demonstrated in the
 installed Krita with a disposable document.
 
-- [ ] Register a true canvas tool or equivalent mode
-- [ ] Receive raw tablet lifecycle and sensor values
-- [ ] Detect a stationary pen-down hold
-- [ ] Keep the rough stroke non-destructive or roll it back safely
-- [ ] Access the current preset and active paint operation
-- [ ] Replay corrected samples through that paint operation
+- [x] Register a true canvas tool or equivalent mode
+- [x] Receive raw tablet lifecycle and sensor values
+- [x] Detect a stationary pen-down hold
+- [x] Keep the rough stroke non-destructive or roll it back safely
+- [x] Access the current preset and active paint operation
+- [x] Replay corrected samples through that paint operation
 - [ ] Create one atomic Undo command
 - [ ] Preview without painting generic substitute pixels
 - [ ] Cancel safely on Escape, tool switch, node change, and document close
