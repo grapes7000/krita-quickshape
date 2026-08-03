@@ -4,6 +4,7 @@ project(krita_quickshape VERSION 0.0.1 LANGUAGES CXX)
 include(CTest)
 
 add_library(quickshape_core
+    core/src/host_contract.cpp
     core/src/stroke.cpp
 )
 target_include_directories(quickshape_core PUBLIC core/include)
@@ -19,4 +20,8 @@ if(BUILD_TESTING)
     add_executable(stroke_test tests/stroke_test.cpp)
     target_link_libraries(stroke_test PRIVATE quickshape_core)
     add_test(NAME stroke_test COMMAND stroke_test)
+
+    add_executable(host_contract_test tests/host_contract_test.cpp)
+    target_link_libraries(host_contract_test PRIVATE quickshape_core)
+    add_test(NAME host_contract_test COMMAND host_contract_test)
 endif()

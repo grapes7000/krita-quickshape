@@ -17,6 +17,7 @@ struct Sample {
     double tilt_x{};
     double tilt_y{};
     double rotation{};
+    double tangential_pressure{};
 };
 
 using Stroke = std::vector<Sample>;

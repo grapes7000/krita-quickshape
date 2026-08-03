@@ -2,9 +2,9 @@
 
 Complete this before integration code or dependency installation.
 
-Audit target: Linux Mint's packaged Krita 5.2.2
-(`1:5.2.2+dfsg-2build8`), upstream tag `v5.2.2`, commit
-`d9ba1af793aefb07c208af292f98aefc9e8ff67a`.
+Audit target: official `krita-5.3.3-x86_64.AppImage` (Qt5). Matching source:
+official `krita-6.0.3.tar.xz`, configured with `BUILD_WITH_QT6=OFF`, which
+reports `KRITA_VERSION_STRING` 5.3.3 and private-library ABI 20.
 
 Checkboxes mean the requirement has been proved on the installed application,
 not merely located in source. Source findings and remaining proof work are in
@@ -12,19 +12,20 @@ not merely located in source. Source findings and remaining proof work are in
 
 ## Environment
 
-- [x] Linux Mint 22.3 and XFCE
+- [x] Ubuntu 26.04 and XFCE
 - [x] X11 session
-- [x] Krita 5.2.2, `/usr/bin/krita`, Ubuntu/Mint deb package
-- [x] System and user resource/plugin paths recorded
-- [x] Qt 5.15.13 and KDE Frameworks 5.115
+- [x] Official Krita 5.3.3 Qt5 AppImage located and cryptographically verified
+- [x] AppImage extracted only under the ignored project `build/` directory
+- [x] Matching 6.0.3 source extracted only under `build/`
 - [ ] Wacom device and input route
-- [x] GCC 13.3, CMake 3.28.3, Ninja 1.11.1, Make 4.3, Git 2.43
-- [x] 31 GiB RAM, 2.6 GiB free disk; matching headers/source absent
-- [x] Existing custom plugins and Krita configuration locations recorded
+- [x] GCC 15.2 and CMake 4.2.3 recorded
+- [x] 76 GiB free after extraction; matching source present
+- [x] Matching Qt5/KF5 development package set simulated and approved; missing
+  development files extracted into ignored `build/deps/` without system install
 
 ## Source/API evidence
 
-Exact-version source evidence exists for the internal native route, but none of
+Matching-source evidence exists for the internal native route, but none of
 these are checked until the corresponding behavior is demonstrated in the
 installed Krita with a disposable document.
 
@@ -44,8 +45,9 @@ For every item record symbol/class names, source paths, version/commit, and conc
 
 Recommend Python plugin, native C++ plugin/tool, minimal Krita patch, or no-go. Include evidence, tradeoffs, dependency/download/disk estimates, and required user approvals.
 
-Current recommendation: **conditional go for a native C++ canvas-tool
-prototype**. Python is a no-go. A minimal Krita patch remains the fallback if a
-separately built plugin cannot link safely to the packaged internal ABI. See
-`docs/RESEARCH_REPORT_0.1.md`. Building is blocked pending explicit approval,
-more free disk, and a connected Wacom device for the final input-route proof.
+Current recommendation: **continue the native C++ canvas-tool prototype**.
+Python is a no-go. The standalone module has compiled, resolved against the
+AppImage libraries, and emitted its registration marker from the exact 5.3.3
+AppImage under isolated XDG directories. Toolbox visibility and all painting,
+cancellation, Undo, and Wacom checks remain interactive proof work. See
+`docs/RESEARCH_REPORT_0.1.md`.

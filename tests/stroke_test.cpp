@@ -212,6 +212,8 @@ void test_remap_sensors() {
     auto original = make_line(0, 0, 10, 0, 11);
     for (std::size_t i = 0; i < original.size(); ++i)
         original[i].pressure = static_cast<double>(i) / 10.0;
+    for (std::size_t i = 0; i < original.size(); ++i)
+        original[i].tangential_pressure = static_cast<double>(i) / 20.0;
 
     // Corrected path is the same length but resampled to 21 points
     auto corrected = quickshape::resample_by_arc_length(
@@ -227,6 +229,8 @@ void test_remap_sensors() {
             "remap: last pressure off");
     require(close(remapped[10].pressure, 0.5, 0.05),
             "remap: midpoint pressure off");
+    require(close(remapped[10].tangential_pressure, 0.25, 0.05),
+            "remap: midpoint tangential pressure off");
 
     // Edge cases
     quickshape::Stroke empty;

@@ -2,7 +2,32 @@
 
 Date: 2026-08-01
 
-Status: read-only research implemented; native prototype not yet implemented.
+Status: historical 5.2.2 audit, superseded as a target by the 2026-08-02
+Krita 5.3.3 retarget below. Native prototype not yet compiled.
+
+## 2026-08-02 target addendum
+
+The sole Gate 1 target is now the official Qt5
+`krita-5.3.3-x86_64.AppImage` on Ubuntu 26.04 XFCE/X11. The corresponding
+source is the official `krita-6.0.3.tar.xz`: its build defaults to Qt5 and
+selects version 5.3.3 in that mode. This is not a claim that the Qt6 6.0.3
+AppImage is compatible.
+
+Both artifacts were checked against KDE's published SHA-256 values and verified
+with Krita release key fingerprint
+`E9FB29E74ADEACC5E3035B8AB69EB4CF7468332F`. They were extracted only below
+the ignored project `build/` tree. Source and binary inspection found the
+matching private ABI 20, `Krita/Tool` registration metadata,
+`KisToolFreehand` pointer lifecycle, and
+`KisToolFreehandHelper::{initPaintImpl,paintLine,cancelPaint,endPaint}`.
+
+The repository now contains a Qt/Krita-free host contract and tested 600 ms
+endpoint-hold lifecycle. It does not yet contain an adapter claimed to load in
+Krita. Ubuntu 26.04's `krita` source package builds Qt6 and therefore cannot be
+used blindly with `apt build-dep` for the Qt5 AppImage. The initial APT
+simulation also reported that source repositories are not configured. The next
+dependency proposal must be derived narrowly from the standalone adapter's
+actual compile failures, then presented with exact install/download sizes.
 
 ## Installed target
 

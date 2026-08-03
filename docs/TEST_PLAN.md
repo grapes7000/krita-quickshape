@@ -27,6 +27,10 @@
 
 ## Interactive Krita matrix
 
+Run only the official Krita 5.3.3 Qt5 AppImage under temporary XDG config,
+cache, and data directories on a disposable document. Record mouse and Wacom
+results separately.
+
 Test on a disposable paint layer with:
 
 - Basic opaque ink preset
@@ -36,6 +40,11 @@ Test on a disposable paint layer with:
 - Eraser preset, if supported
 
 For each preset verify immediate lift, hold correction, preview, commit, Escape, Undo, tool switch, layer switch, document close, rapid repeated strokes, and a long stroke.
+
+Capture evidence for position, timestamp, pressure, X/Y tilt, rotation, and
+tangential pressure where the device supplies them. Record separately:
+compiled, loaded, mouse-tested, Wacom-tested, active preset confirmed,
+cancellation confirmed, and one-step Undo confirmed.
 
 ## Required evidence
 

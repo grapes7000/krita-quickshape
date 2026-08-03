@@ -1,4 +1,12 @@
 /build/
+/build-*/
+/krita-*.AppImage
+/krita-*.AppImage.sig
+/krita-*.appimage
+/krita-*.appimage.*
+/krita-*.tar.xz
+/krita-*.tar.xz.sig
+/krita-release-signing-key.gpg
 /.cache/
 *.user
 *.swp

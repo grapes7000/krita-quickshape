@@ -69,6 +69,9 @@ Sample lerp_sample(const Sample& a, const Sample& b, double t) {
     result.tilt_x = a.tilt_x + t * (b.tilt_x - a.tilt_x);
     result.tilt_y = a.tilt_y + t * (b.tilt_y - a.tilt_y);
     result.rotation = a.rotation + t * (b.rotation - a.rotation);
+    result.tangential_pressure =
+        a.tangential_pressure +
+        t * (b.tangential_pressure - a.tangential_pressure);
     return result;
 }
 
@@ -244,6 +247,7 @@ Stroke remap_sensors(const Stroke& corrected, const Stroke& original) {
             s.tilt_x = original[0].tilt_x;
             s.tilt_y = original[0].tilt_y;
             s.rotation = original[0].rotation;
+            s.tangential_pressure = original[0].tangential_pressure;
         }
         return result;
     }
@@ -265,6 +269,7 @@ Stroke remap_sensors(const Stroke& corrected, const Stroke& original) {
         result[i].tilt_x = mapped.tilt_x;
         result[i].tilt_y = mapped.tilt_y;
         result[i].rotation = mapped.rotation;
+        result[i].tangential_pressure = mapped.tangential_pressure;
     }
     return result;
 }
