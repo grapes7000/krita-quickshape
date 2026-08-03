@@ -48,8 +48,9 @@ that applies general corner-aware smoothing.
 
 ### Gap
 
-- Arc fitting implemented (circular arc for open strokes). Elliptical arc
-  fitting could be added later but circular arcs cover the most common case.
+- Arc/curve fitting implemented: circular arc, quadratic Bezier (parabolic
+  curves), and cubic Bezier (S-curves, exponential, logarithmic, and general
+  smooth curves). Multi-model selection picks the best fit automatically.
 - Our smoothing fallback when no shape matches is BETTER than Procreate, which
   has no smoothing fallback at all.
 - Stars are a bonus shape Procreate doesn't have.

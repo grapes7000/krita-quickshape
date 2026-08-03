@@ -146,30 +146,103 @@ LineFit fit_line(const Stroke& input) {
     return result;
 }
 
-// --- Arc fitting (circular arc for open strokes) ---
+// --- Arc fitting (multi-model: circular arc, quadratic Bezier, cubic Bezier) ---
 
-ArcFit fit_arc(const Stroke& input) {
-    ArcFit result;
-    if (input.size() < 5) {
-        result.residual = std::numeric_limits<double>::max();
-        return result;
+namespace {
+
+// Compute cumulative arc-length parameter t_i in [0,1] for each sample
+std::vector<double> arc_length_params(const Stroke& input) {
+    std::vector<double> t(input.size(), 0.0);
+    for (std::size_t i = 1; i < input.size(); ++i) {
+        t[i] = t[i - 1] + distance(input[i].position, input[i - 1].position);
     }
+    double total = t.back();
+    if (total > 1e-12) {
+        for (auto& v : t) v /= total;
+    }
+    return t;
+}
+
+double mean_point_to_curve_distance(const Stroke& input,
+                                     const Stroke& curve) {
+    double sum = 0;
+    for (const auto& s : input) {
+        double best = std::numeric_limits<double>::max();
+        for (std::size_t i = 0; i + 1 < curve.size(); ++i) {
+            best = std::min(best,
+                            point_to_segment_distance(s.position,
+                                                      curve[i].position,
+                                                      curve[i + 1].position));
+        }
+        sum += best;
+    }
+    return sum / static_cast<double>(input.size());
+}
+
+}  // namespace
+
+static Point eval_quadratic_bezier(Point p0, Point p1, Point p2, double t) {
+    double u = 1.0 - t;
+    return {u * u * p0.x + 2.0 * u * t * p1.x + t * t * p2.x,
+            u * u * p0.y + 2.0 * u * t * p1.y + t * t * p2.y};
+}
+
+static Point eval_cubic_bezier(Point p0, Point p1, Point p2, Point p3,
+                                double t) {
+    double u = 1.0 - t;
+    double u2 = u * u, u3 = u2 * u;
+    double t2 = t * t, t3 = t2 * t;
+    return {u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x,
+            u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y};
+}
+
+static Stroke sample_quadratic_bezier(Point p0, Point p1, Point p2,
+                                       std::size_t n) {
+    Stroke s;
+    s.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        double t = static_cast<double>(i) / static_cast<double>(n - 1);
+        Sample sam;
+        sam.position = eval_quadratic_bezier(p0, p1, p2, t);
+        s.push_back(sam);
+    }
+    return s;
+}
+
+static Stroke sample_cubic_bezier(Point p0, Point p1, Point p2, Point p3,
+                                   std::size_t n) {
+    Stroke s;
+    s.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        double t = static_cast<double>(i) / static_cast<double>(n - 1);
+        Sample sam;
+        sam.position = eval_cubic_bezier(p0, p1, p2, p3, t);
+        s.push_back(sam);
+    }
+    return s;
+}
+
+namespace {
+
+ArcFit fit_circular_arc(const Stroke& input) {
+    ArcFit result;
+    result.model = CurveModel::CircularArc;
+    result.residual = std::numeric_limits<double>::max();
+
+    if (input.size() < 5) return result;
 
     auto cf = fit_circle(input);
-    if (cf.radius < 1e-6 || cf.residual >= std::numeric_limits<double>::max()) {
-        result.residual = std::numeric_limits<double>::max();
+    if (cf.radius < 1e-6 || cf.residual >= std::numeric_limits<double>::max())
         return result;
-    }
 
     result.center = cf.center;
     result.radius = cf.radius;
 
-    double start_angle = std::atan2(input.front().position.y - cf.center.y,
-                                    input.front().position.x - cf.center.x);
-    double end_angle = std::atan2(input.back().position.y - cf.center.y,
-                                  input.back().position.x - cf.center.x);
+    double sa = std::atan2(input.front().position.y - cf.center.y,
+                           input.front().position.x - cf.center.x);
+    double ea = std::atan2(input.back().position.y - cf.center.y,
+                           input.back().position.x - cf.center.x);
 
-    // Determine winding direction from the stroke samples
     double cross_sum = 0;
     for (std::size_t i = 1; i < input.size(); ++i) {
         double a_prev = std::atan2(input[i - 1].position.y - cf.center.y,
@@ -181,34 +254,166 @@ ArcFit fit_arc(const Stroke& input) {
         if (diff < -M_PI) diff += 2.0 * M_PI;
         cross_sum += diff;
     }
-    bool ccw = cross_sum > 0;
 
-    // Adjust end_angle so the arc sweeps in the correct direction
-    if (ccw) {
-        while (end_angle < start_angle) end_angle += 2.0 * M_PI;
+    if (cross_sum > 0) {
+        while (ea < sa) ea += 2.0 * M_PI;
     } else {
-        while (end_angle > start_angle) end_angle -= 2.0 * M_PI;
+        while (ea > sa) ea -= 2.0 * M_PI;
     }
 
-    result.start_angle = start_angle;
-    result.end_angle = end_angle;
+    double sweep = std::abs(ea - sa);
+    if (sweep > 1.9 * M_PI || sweep < 0.15) return result;
 
-    // Reject arcs that span nearly a full circle or are too small
-    double sweep = std::abs(end_angle - start_angle);
-    if (sweep > 1.9 * M_PI || sweep < 0.15) {
-        result.residual = std::numeric_limits<double>::max();
-        return result;
-    }
+    result.start_angle = sa;
+    result.end_angle = ea;
 
-    // Compute residual: distance from each sample to the ideal arc
     double err_sum = 0;
     for (const auto& s : input) {
-        double d = std::abs(distance(s.position, cf.center) - cf.radius);
-        err_sum += d;
+        err_sum += std::abs(distance(s.position, cf.center) - cf.radius);
     }
     result.residual = err_sum / static_cast<double>(input.size());
 
     return result;
+}
+
+ArcFit fit_quadratic_bezier(const Stroke& input) {
+    ArcFit result;
+    result.model = CurveModel::QuadraticBezier;
+    result.residual = std::numeric_limits<double>::max();
+
+    if (input.size() < 3) return result;
+
+    Point p0 = input.front().position;
+    Point p2 = input.back().position;
+    auto t = arc_length_params(input);
+
+    // Least-squares solve for P1 with fixed endpoints:
+    // minimize Σ|S_i - (1-t_i)²P0 - 2(1-t_i)t_i*P1 - t_i²P2|²
+    double sum_b2 = 0;
+    double sum_brx = 0, sum_bry = 0;
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        double u = 1.0 - t[i];
+        double basis = 2.0 * u * t[i];
+        double rx = input[i].position.x - u * u * p0.x - t[i] * t[i] * p2.x;
+        double ry = input[i].position.y - u * u * p0.y - t[i] * t[i] * p2.y;
+        sum_b2 += basis * basis;
+        sum_brx += basis * rx;
+        sum_bry += basis * ry;
+    }
+
+    if (sum_b2 < 1e-12) return result;
+
+    Point p1{sum_brx / sum_b2, sum_bry / sum_b2};
+
+    // Reject if P1 is nearly on the P0-P2 line (stroke is straight)
+    double chord = distance(p0, p2);
+    if (chord > 1e-6) {
+        double deviation = point_to_segment_distance(p1, p0, p2);
+        if (deviation / chord < 0.03) return result;
+    }
+
+    result.control_points = {p0, p1, p2};
+
+    auto curve = sample_quadratic_bezier(p0, p1, p2, std::max<std::size_t>(input.size(), 32));
+    result.residual = mean_point_to_curve_distance(input, curve);
+
+    return result;
+}
+
+ArcFit fit_cubic_bezier(const Stroke& input) {
+    ArcFit result;
+    result.model = CurveModel::CubicBezier;
+    result.residual = std::numeric_limits<double>::max();
+
+    if (input.size() < 4) return result;
+
+    Point p0 = input.front().position;
+    Point p3 = input.back().position;
+    auto t = arc_length_params(input);
+
+    // Least-squares solve for P1, P2 with fixed endpoints:
+    // Basis: B1(t) = 3(1-t)²t, B2(t) = 3(1-t)t²
+    // R_i = S_i - (1-t_i)³P0 - t_i³P3
+    // [Σ B1²   Σ B1*B2] [P1]   [Σ B1*R]
+    // [Σ B1*B2 Σ B2²  ] [P2] = [Σ B2*R]
+    double a11 = 0, a12 = 0, a22 = 0;
+    double b1x = 0, b1y = 0, b2x = 0, b2y = 0;
+
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        double u = 1.0 - t[i];
+        double u2 = u * u, u3 = u2 * u;
+        double t2 = t[i] * t[i], t3 = t2 * t[i];
+        double basis1 = 3.0 * u2 * t[i];
+        double basis2 = 3.0 * u * t2;
+        double rx = input[i].position.x - u3 * p0.x - t3 * p3.x;
+        double ry = input[i].position.y - u3 * p0.y - t3 * p3.y;
+
+        a11 += basis1 * basis1;
+        a12 += basis1 * basis2;
+        a22 += basis2 * basis2;
+        b1x += basis1 * rx;
+        b1y += basis1 * ry;
+        b2x += basis2 * rx;
+        b2y += basis2 * ry;
+    }
+
+    double det = a11 * a22 - a12 * a12;
+    if (std::abs(det) < 1e-20) return result;
+
+    Point p1{(b1x * a22 - b2x * a12) / det, (b1y * a22 - b2y * a12) / det};
+    Point p2{(a11 * b2x - a12 * b1x) / det, (a11 * b2y - a12 * b1y) / det};
+
+    // Reject if both control points are nearly on the P0-P3 line
+    double chord = distance(p0, p3);
+    if (chord > 1e-6) {
+        double d1 = point_to_segment_distance(p1, p0, p3);
+        double d2 = point_to_segment_distance(p2, p0, p3);
+        if (d1 / chord < 0.03 && d2 / chord < 0.03) return result;
+    }
+
+    result.control_points = {p0, p1, p2, p3};
+
+    auto curve = sample_cubic_bezier(p0, p1, p2, p3, std::max<std::size_t>(input.size(), 32));
+    result.residual = mean_point_to_curve_distance(input, curve);
+
+    return result;
+}
+
+}  // namespace
+
+ArcFit fit_arc(const Stroke& input) {
+    ArcFit best;
+    best.residual = std::numeric_limits<double>::max();
+
+    if (input.size() < 3) return best;
+
+    auto circ = fit_circular_arc(input);
+    auto quad = fit_quadratic_bezier(input);
+    auto cubic = fit_cubic_bezier(input);
+
+    // Pick the model with lowest residual, with a small complexity penalty
+    // to prefer simpler models when fits are close
+    auto penalized = [](double residual, double penalty) {
+        if (residual >= std::numeric_limits<double>::max()) return residual;
+        return residual * (1.0 + penalty);
+    };
+
+    double circ_score = penalized(circ.residual, 0.0);
+    double quad_score = penalized(quad.residual, 0.02);
+    double cubic_score = penalized(cubic.residual, 0.05);
+
+    best = circ;
+    double best_score = circ_score;
+
+    if (quad_score < best_score) {
+        best = quad;
+        best_score = quad_score;
+    }
+    if (cubic_score < best_score) {
+        best = cubic;
+    }
+
+    return best;
 }
 
 // --- Circle fitting (Kåsa algebraic) ---
@@ -597,19 +802,39 @@ Stroke stroke_from_line(const LineFit& fit, std::size_t sample_count) {
 }
 
 Stroke stroke_from_arc(const ArcFit& fit, std::size_t sample_count) {
-    Stroke s;
     if (sample_count < 2) sample_count = 32;
-    s.reserve(sample_count);
-    for (std::size_t i = 0; i < sample_count; ++i) {
-        double t = static_cast<double>(i) /
-                   static_cast<double>(sample_count - 1);
-        double angle = fit.start_angle + t * (fit.end_angle - fit.start_angle);
-        Sample sam;
-        sam.position.x = fit.center.x + fit.radius * std::cos(angle);
-        sam.position.y = fit.center.y + fit.radius * std::sin(angle);
-        s.push_back(sam);
+
+    switch (fit.model) {
+    case CurveModel::CircularArc: {
+        Stroke s;
+        s.reserve(sample_count);
+        for (std::size_t i = 0; i < sample_count; ++i) {
+            double t = static_cast<double>(i) /
+                       static_cast<double>(sample_count - 1);
+            double angle = fit.start_angle +
+                           t * (fit.end_angle - fit.start_angle);
+            Sample sam;
+            sam.position.x = fit.center.x + fit.radius * std::cos(angle);
+            sam.position.y = fit.center.y + fit.radius * std::sin(angle);
+            s.push_back(sam);
+        }
+        return s;
     }
-    return s;
+    case CurveModel::QuadraticBezier: {
+        if (fit.control_points.size() < 3) return {};
+        return sample_quadratic_bezier(fit.control_points[0],
+                                       fit.control_points[1],
+                                       fit.control_points[2], sample_count);
+    }
+    case CurveModel::CubicBezier: {
+        if (fit.control_points.size() < 4) return {};
+        return sample_cubic_bezier(fit.control_points[0],
+                                   fit.control_points[1],
+                                   fit.control_points[2],
+                                   fit.control_points[3], sample_count);
+    }
+    }
+    return {};
 }
 
 Stroke stroke_from_circle(const CircleFit& fit, std::size_t sample_count) {

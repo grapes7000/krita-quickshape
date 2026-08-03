@@ -52,7 +52,7 @@ Or run:
 
 ## Current scope
 
-The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, arcs, circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
+The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, arcs/curves (circular arc, quadratic and cubic Bezier), circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
 
 The `krita_5_3_3` adapter loads into the official Krita 5.3.3 AppImage and performs stroke capture, hold detection, cancellation, and corrected-path replay through the active brush preset. Shape recognition (Gate 3/4) is implemented in the core and being integrated into the live tool. Currently debugging and optimizing the correction flow.
 

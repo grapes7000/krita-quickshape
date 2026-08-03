@@ -52,11 +52,24 @@ struct StarFit {
     double residual{};
 };
 
+enum class CurveModel : std::uint8_t {
+    CircularArc,
+    QuadraticBezier,
+    CubicBezier,
+};
+
 struct ArcFit {
+    CurveModel model{CurveModel::CircularArc};
+
+    // CircularArc parameters
     Point center{};
     double radius{};
     double start_angle{};
     double end_angle{};
+
+    // Bezier control points (3 for quadratic, 4 for cubic)
+    std::vector<Point> control_points;
+
     double residual{};
 };
 

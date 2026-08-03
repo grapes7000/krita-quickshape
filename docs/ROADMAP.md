@@ -41,7 +41,7 @@ Status: implemented and tested. Star recognition deferred to Gate 4.
 - [x] Ellipse fitting (covariance-axis estimation).
 - [x] Triangle, rectangle, and general polygon (RDP simplification).
 - [x] Confidence scoring with safe fallback to None.
-- [x] Arc fitting (circular arc for open strokes).
+- [x] Arc/curve fitting (circular arc, quadratic Bezier, cubic Bezier).
 
 ## Gate 4 — Five-point stars
 
@@ -63,7 +63,7 @@ correction flow. Shape recognition integration (Gates 3/4) in progress.
 - [x] Stroke capture, hold detection, and cancellation working.
 - [x] Corrected-path replay through active brush preset.
 - [ ] Shape recognition integration (line, arc, circle, ellipse, polygon, star).
-- [x] Arc fitting (open curved segment — circular arc for open strokes).
+- [x] Arc/curve fitting (circular arc, quadratic/cubic Bezier for open strokes).
 - [ ] Configurable hold delay (100–1500ms) in Tool Options.
 - [ ] Post-snap drag interaction (scale/rotate while pen is still down).
 - [ ] Perfect-form modifier (Shift → circle/square/equilateral).

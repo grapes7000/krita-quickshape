@@ -277,6 +277,78 @@ void test_classify_arc() {
     require(result.confidence > 0.5, "classify_arc: low confidence");
 }
 
+void test_fit_parabola() {
+    // y = 0.01 * x² — a parabolic curve
+    quickshape::Stroke parabola;
+    for (int i = -20; i <= 20; ++i) {
+        double x = static_cast<double>(i) * 2.0;
+        double y = 0.01 * x * x;
+        parabola.push_back(make_sample(x, y));
+    }
+    auto af = quickshape::fit_arc(parabola);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_parabola: rejected");
+    require(af.residual < 2.0, "fit_parabola: residual too large");
+    // Any curve model is acceptable as long as the fit is good
+    (void)af.model;
+}
+
+void test_fit_s_curve() {
+    // S-curve: y = sin(x/10) * 20 over x in [0, 60]
+    quickshape::Stroke scurve;
+    for (int i = 0; i <= 40; ++i) {
+        double x = static_cast<double>(i) * 1.5;
+        double y = 20.0 * std::sin(x / 10.0);
+        scurve.push_back(make_sample(x, y));
+    }
+    auto af = quickshape::fit_arc(scurve);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_s_curve: rejected");
+    require(af.model == quickshape::CurveModel::CubicBezier,
+            "fit_s_curve: should use cubic Bezier");
+}
+
+void test_fit_exponential_curve() {
+    // Exponential-like: y = e^(x/20) - 1 over x in [0, 40]
+    quickshape::Stroke curve;
+    for (int i = 0; i <= 30; ++i) {
+        double x = static_cast<double>(i) * (40.0 / 30.0);
+        double y = (std::exp(x / 20.0) - 1.0) * 10.0;
+        curve.push_back(make_sample(x, y));
+    }
+    auto af = quickshape::fit_arc(curve);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_exp: rejected");
+    require(af.residual < 3.0, "fit_exp: residual too large");
+}
+
+void test_fit_log_curve() {
+    // Logarithmic: y = 20 * ln(1 + x/10) over x in [1, 50]
+    quickshape::Stroke curve;
+    for (int i = 0; i <= 30; ++i) {
+        double x = 1.0 + static_cast<double>(i) * (49.0 / 30.0);
+        double y = 20.0 * std::log(1.0 + x / 10.0);
+        curve.push_back(make_sample(x, y));
+    }
+    auto af = quickshape::fit_arc(curve);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_log: rejected");
+    require(af.residual < 3.0, "fit_log: residual too large");
+}
+
+void test_classify_parabola() {
+    quickshape::Stroke parabola;
+    for (int i = -15; i <= 15; ++i) {
+        double x = static_cast<double>(i) * 2.0;
+        double y = 0.02 * x * x;
+        parabola.push_back(make_sample(x, y));
+    }
+    auto result = quickshape::classify(parabola, {.confidence_threshold = 0.5});
+    require(result.type == quickshape::ShapeType::Arc,
+            "classify_parabola: not recognized as arc");
+    require(result.confidence > 0.5, "classify_parabola: low confidence");
+}
+
 void test_arc_reject_straight_line() {
     quickshape::Stroke line;
     for (int i = 0; i <= 30; ++i)
@@ -399,6 +471,11 @@ int main() {
     test_fit_arc_quarter();
     test_fit_arc_with_jitter();
     test_classify_arc();
+    test_fit_parabola();
+    test_fit_s_curve();
+    test_fit_exponential_curve();
+    test_fit_log_curve();
+    test_classify_parabola();
     test_arc_reject_straight_line();
     test_stroke_from_arc();
     test_fit_star();
