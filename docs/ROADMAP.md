@@ -63,11 +63,16 @@ correction flow. Shape recognition integration (Gates 3/4) in progress.
 - [x] Stroke capture, hold detection, and cancellation working.
 - [x] Corrected-path replay through active brush preset.
 - [ ] Shape recognition integration (line, circle, ellipse, polygon, star).
+- [ ] Arc fitting (open curved segment — Procreate has this, we don't).
+- [ ] Configurable hold delay (100–1500ms) in Tool Options.
+- [ ] Post-snap drag interaction (scale/rotate while pen is still down).
+- [ ] Perfect-form modifier (Shift → circle/square/equilateral).
+- [ ] 15° rotation snapping (Ctrl+drag).
 - [ ] Tool Options panel.
-- [ ] Preview/adjustment behavior.
 - [ ] Persistent settings and bypass modifier.
 - [ ] Safe unsupported-layer and cancellation edge cases.
 - [ ] One-step Undo verification.
+- [ ] Edit Shape mode (post-commit node editing — lower priority).
 
 ## Gate 6 — Packaging
 
