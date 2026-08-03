@@ -236,6 +236,149 @@ Stroke smooth_positions_preserve_corners(
     return output;
 }
 
+// --- Gaussian smoothing ---
+
+Stroke smooth_gaussian(const Stroke& input,
+                       const std::vector<std::size_t>& corners,
+                       const GaussianSmoothingOptions& options) {
+    if (input.size() < 3 || options.sigma < 0.1) return input;
+
+    auto is_corner = [&](std::size_t idx) {
+        for (auto c : corners) {
+            if (c == idx) return true;
+        }
+        return false;
+    };
+
+    auto crosses_corner = [&](std::size_t i, std::size_t j) {
+        std::size_t lo = std::min(i, j), hi = std::max(i, j);
+        for (auto c : corners) {
+            if (lo < c && c < hi) return true;
+        }
+        return false;
+    };
+
+    const std::size_t window =
+        static_cast<std::size_t>(std::ceil(options.sigma * 3.0));
+
+    Stroke current = input;
+    for (std::size_t pass = 0; pass < options.passes; ++pass) {
+        Stroke next = current;
+        for (std::size_t i = 0; i < current.size(); ++i) {
+            if (options.preserve_endpoints &&
+                (i == 0 || i + 1 == current.size()))
+                continue;
+            if (is_corner(i)) continue;
+
+            double wx = 0, wy = 0, wsum = 0;
+            std::size_t begin = i > window ? i - window : 0;
+            std::size_t end =
+                std::min(current.size() - 1, i + window);
+
+            for (std::size_t j = begin; j <= end; ++j) {
+                if (crosses_corner(i, j)) continue;
+                double d = static_cast<double>(j) - static_cast<double>(i);
+                double w = std::exp(-0.5 * d * d /
+                                    (options.sigma * options.sigma));
+                wx += w * current[j].position.x;
+                wy += w * current[j].position.y;
+                wsum += w;
+            }
+            if (wsum > 0) {
+                next[i].position = {wx / wsum, wy / wsum};
+            }
+        }
+        current = next;
+    }
+    return current;
+}
+
+// --- Adaptive smoothing ---
+
+Stroke smooth_adaptive(const Stroke& input,
+                       const std::vector<std::size_t>& corners,
+                       const AdaptiveSmoothingOptions& options) {
+    if (input.size() < 3 || options.base_sigma < 0.1) return input;
+
+    // Compute per-sample local curvature (turning angle)
+    std::vector<double> curvature(input.size(), 0.0);
+    for (std::size_t i = 1; i + 1 < input.size(); ++i) {
+        double dx1 = input[i].position.x - input[i - 1].position.x;
+        double dy1 = input[i].position.y - input[i - 1].position.y;
+        double dx2 = input[i + 1].position.x - input[i].position.x;
+        double dy2 = input[i + 1].position.y - input[i].position.y;
+        double len1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
+        double len2 = std::sqrt(dx2 * dx2 + dy2 * dy2);
+        if (len1 < 1e-12 || len2 < 1e-12) continue;
+        double dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2);
+        curvature[i] = std::acos(std::clamp(dot, -1.0, 1.0));
+    }
+
+    // Normalize curvature to [0,1] range
+    double max_curv = 0;
+    for (auto c : curvature) max_curv = std::max(max_curv, c);
+    if (max_curv < 1e-12) max_curv = 1.0;
+
+    // Compute per-sample adaptive sigma:
+    // high curvature → less smoothing (preserve detail)
+    // low curvature → more smoothing (clean up wobble)
+    std::vector<double> sigma_map(input.size());
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        double norm_curv = curvature[i] / max_curv;
+        double factor =
+            1.0 - options.curvature_preservation * norm_curv;
+        sigma_map[i] = options.base_sigma * std::max(factor, 0.1);
+    }
+
+    auto is_corner = [&](std::size_t idx) {
+        for (auto c : corners) {
+            if (c == idx) return true;
+        }
+        return false;
+    };
+
+    auto crosses_corner = [&](std::size_t i, std::size_t j) {
+        std::size_t lo = std::min(i, j), hi = std::max(i, j);
+        for (auto c : corners) {
+            if (lo < c && c < hi) return true;
+        }
+        return false;
+    };
+
+    Stroke current = input;
+    for (std::size_t pass = 0; pass < options.passes; ++pass) {
+        Stroke next = current;
+        for (std::size_t i = 0; i < current.size(); ++i) {
+            if (options.preserve_endpoints &&
+                (i == 0 || i + 1 == current.size()))
+                continue;
+            if (is_corner(i)) continue;
+
+            double sig = sigma_map[i];
+            std::size_t window =
+                static_cast<std::size_t>(std::ceil(sig * 3.0));
+            double wx = 0, wy = 0, wsum = 0;
+            std::size_t begin = i > window ? i - window : 0;
+            std::size_t end =
+                std::min(current.size() - 1, i + window);
+
+            for (std::size_t j = begin; j <= end; ++j) {
+                if (crosses_corner(i, j)) continue;
+                double d = static_cast<double>(j) - static_cast<double>(i);
+                double w = std::exp(-0.5 * d * d / (sig * sig));
+                wx += w * current[j].position.x;
+                wy += w * current[j].position.y;
+                wsum += w;
+            }
+            if (wsum > 0) {
+                next[i].position = {wx / wsum, wy / wsum};
+            }
+        }
+        current = next;
+    }
+    return current;
+}
+
 // --- Sensor remapping ---
 
 Stroke remap_sensors(const Stroke& corrected, const Stroke& original) {

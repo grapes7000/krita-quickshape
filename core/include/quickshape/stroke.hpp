@@ -66,6 +66,19 @@ struct SmoothingOptions {
     bool preserve_endpoints{true};
 };
 
+struct GaussianSmoothingOptions {
+    double sigma{3.0};
+    std::size_t passes{2};
+    bool preserve_endpoints{true};
+};
+
+struct AdaptiveSmoothingOptions {
+    double base_sigma{3.0};
+    std::size_t passes{2};
+    double curvature_preservation{0.7};
+    bool preserve_endpoints{true};
+};
+
 [[nodiscard]] Stroke smooth_positions(const Stroke& input,
                                       const SmoothingOptions& options = {});
 
@@ -73,6 +86,16 @@ struct SmoothingOptions {
     const Stroke& input,
     const std::vector<std::size_t>& corners,
     const SmoothingOptions& options = {});
+
+[[nodiscard]] Stroke smooth_gaussian(
+    const Stroke& input,
+    const std::vector<std::size_t>& corners,
+    const GaussianSmoothingOptions& options = {});
+
+[[nodiscard]] Stroke smooth_adaptive(
+    const Stroke& input,
+    const std::vector<std::size_t>& corners,
+    const AdaptiveSmoothingOptions& options = {});
 
 // --- Sensor remapping ---
 

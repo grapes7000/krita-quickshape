@@ -283,6 +283,111 @@ void test_pipeline() {
             "pipeline: last endpoint drifted");
 }
 
+void test_gaussian_smoothing() {
+    // Wobbly horizontal stroke
+    quickshape::Stroke wobbly;
+    for (int i = 0; i <= 30; ++i) {
+        double x = static_cast<double>(i);
+        double noise = 2.0 * ((i % 3) - 1.0);
+        wobbly.push_back(make_sample(x, noise));
+    }
+
+    auto corners = quickshape::detect_corners(wobbly);
+    auto smoothed = quickshape::smooth_gaussian(
+        wobbly, corners, {.sigma = 2.0, .passes = 2});
+
+    require(smoothed.size() == wobbly.size(),
+            "gaussian: sample count changed");
+    require(close(smoothed.front().position.x, 0.0),
+            "gaussian: first endpoint moved");
+    require(close(smoothed.back().position.x, 30.0),
+            "gaussian: last endpoint moved");
+
+    // Smoothed version should have less y-variance
+    double orig_var = 0, smooth_var = 0;
+    for (std::size_t i = 1; i + 1 < wobbly.size(); ++i) {
+        orig_var += wobbly[i].position.y * wobbly[i].position.y;
+        smooth_var += smoothed[i].position.y * smoothed[i].position.y;
+    }
+    require(smooth_var < orig_var,
+            "gaussian: smoothing did not reduce wobble");
+}
+
+void test_adaptive_smoothing() {
+    // Stroke with a curve section (high curvature) and a flat section
+    quickshape::Stroke mixed;
+    // Flat section
+    for (int i = 0; i <= 15; ++i) {
+        double noise = 1.5 * ((i % 3) - 1.0);
+        mixed.push_back(make_sample(static_cast<double>(i), noise));
+    }
+    // Curved section (quarter circle)
+    for (int i = 1; i <= 15; ++i) {
+        double angle = static_cast<double>(i) / 15.0 * M_PI / 2.0;
+        double noise = 1.5 * ((i % 3) - 1.0);
+        mixed.push_back(
+            make_sample(15.0 + 10.0 * std::sin(angle),
+                        10.0 * (1.0 - std::cos(angle)) + noise));
+    }
+
+    auto corners = quickshape::detect_corners(mixed);
+    auto smoothed = quickshape::smooth_adaptive(
+        mixed, corners, {.base_sigma = 3.0, .passes = 2,
+                         .curvature_preservation = 0.8});
+
+    require(smoothed.size() == mixed.size(),
+            "adaptive: sample count changed");
+    require(close(smoothed.front().position.x, 0.0),
+            "adaptive: first endpoint moved");
+}
+
+void test_gaussian_preserves_corners() {
+    // V-shape with sharp corner
+    quickshape::Stroke vshape;
+    for (int i = 0; i <= 10; ++i)
+        vshape.push_back(make_sample(static_cast<double>(i),
+                                      static_cast<double>(i)));
+    for (int i = 1; i <= 10; ++i)
+        vshape.push_back(make_sample(10.0 + static_cast<double>(i),
+                                      10.0 - static_cast<double>(i)));
+
+    std::vector<std::size_t> corners{10};
+    auto smoothed = quickshape::smooth_gaussian(
+        vshape, corners, {.sigma = 2.0, .passes = 2});
+
+    require(close(smoothed[10].position.x, 10.0, 0.01),
+            "gaussian_corner: corner x moved");
+    require(close(smoothed[10].position.y, 10.0, 0.01),
+            "gaussian_corner: corner y moved");
+}
+
+void test_pipeline_gaussian() {
+    // Full pipeline with gaussian smoothing
+    quickshape::Stroke raw;
+    for (int i = 0; i <= 20; ++i) {
+        double x = static_cast<double>(i);
+        double y = (i <= 10) ? static_cast<double>(i)
+                             : 20.0 - static_cast<double>(i);
+        double jitter = 0.5 * ((i % 3) - 1);
+        raw.push_back(make_sample(x, y + jitter, 0.5,
+                                   static_cast<std::int64_t>(i) * 1000));
+    }
+
+    auto deduped = quickshape::deduplicate(raw);
+    auto resampled = quickshape::resample_by_arc_length(
+        deduped, {.target_count = 30});
+    auto corners = quickshape::detect_corners(resampled);
+    auto smoothed = quickshape::smooth_adaptive(
+        resampled, corners, {.base_sigma = 2.0, .passes = 2});
+    auto final_stroke = quickshape::remap_sensors(smoothed, raw);
+
+    require(final_stroke.size() == 30,
+            "pipeline_gaussian: wrong count");
+    require(close(final_stroke.front().position.x,
+                  resampled.front().position.x),
+            "pipeline_gaussian: first endpoint drifted");
+}
+
 }  // namespace
 
 int main() {
@@ -295,6 +400,10 @@ int main() {
     test_smooth_preserve_corners();
     test_remap_sensors();
     test_pipeline();
+    test_gaussian_smoothing();
+    test_adaptive_smoothing();
+    test_gaussian_preserves_corners();
+    test_pipeline_gaussian();
 
     if (g_failures > 0) {
         std::cerr << g_failures << " test(s) failed\n";
