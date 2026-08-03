@@ -121,6 +121,20 @@ quickshape::Stroke make_star(double cx, double cy, double outer_r,
     return s;
 }
 
+quickshape::Stroke make_arc(double cx, double cy, double r,
+                            double start_angle, double end_angle,
+                            std::size_t n, double jitter = 0.0) {
+    quickshape::Stroke s;
+    for (std::size_t i = 0; i < n; ++i) {
+        double t = static_cast<double>(i) / static_cast<double>(n - 1);
+        double angle = start_angle + t * (end_angle - start_angle);
+        double noise = jitter * ((static_cast<double>(i % 5) - 2.0) / 2.0);
+        s.push_back(make_sample(cx + (r + noise) * std::cos(angle),
+                                cy + (r + noise) * std::sin(angle)));
+    }
+    return s;
+}
+
 // --- Tests ---
 
 void test_fit_line() {
@@ -226,6 +240,69 @@ void test_classify_fallback() {
             "classify_fallback: chaotic stroke was classified");
 }
 
+void test_fit_arc() {
+    auto arc = make_arc(50, 50, 30, 0.0, M_PI, 40);
+    auto af = quickshape::fit_arc(arc);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_arc: rejected");
+    require(close(af.center.x, 50, 3), "fit_arc: center.x off");
+    require(close(af.center.y, 50, 3), "fit_arc: center.y off");
+    require(close(af.radius, 30, 3), "fit_arc: radius off");
+    require(af.residual < 2.0, "fit_arc: residual too large");
+}
+
+void test_fit_arc_quarter() {
+    auto arc = make_arc(0, 0, 100, 0.0, M_PI / 2.0, 30);
+    auto af = quickshape::fit_arc(arc);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_arc_quarter: rejected");
+    require(close(af.radius, 100, 5), "fit_arc_quarter: radius off");
+    require(af.residual < 3.0, "fit_arc_quarter: residual too large");
+}
+
+void test_fit_arc_with_jitter() {
+    auto arc = make_arc(50, 50, 40, 0.5, 2.5, 50, 2.0);
+    auto af = quickshape::fit_arc(arc);
+    require(af.residual < std::numeric_limits<double>::max(),
+            "fit_arc_jitter: rejected");
+    require(close(af.center.x, 50, 5), "fit_arc_jitter: center.x off");
+    require(close(af.center.y, 50, 5), "fit_arc_jitter: center.y off");
+}
+
+void test_classify_arc() {
+    auto arc = make_arc(50, 50, 30, 0.0, M_PI * 0.8, 50);
+    auto result = quickshape::classify(arc, {.confidence_threshold = 0.5});
+    require(result.type == quickshape::ShapeType::Arc,
+            "classify_arc: not recognized as arc");
+    require(result.confidence > 0.5, "classify_arc: low confidence");
+}
+
+void test_arc_reject_straight_line() {
+    quickshape::Stroke line;
+    for (int i = 0; i <= 30; ++i)
+        line.push_back(make_sample(static_cast<double>(i), 0.5 * static_cast<double>(i)));
+    auto af = quickshape::fit_arc(line);
+    // A straight line should either be rejected or have a very large radius
+    // The classifier should prefer line over arc for straight strokes
+    auto result = quickshape::classify(line, {.confidence_threshold = 0.5});
+    require(result.type == quickshape::ShapeType::Line,
+            "arc_reject_line: straight line classified as arc");
+}
+
+void test_stroke_from_arc() {
+    quickshape::ArcFit af;
+    af.center = {50, 50};
+    af.radius = 30;
+    af.start_angle = 0;
+    af.end_angle = M_PI;
+    auto stroke = quickshape::stroke_from_arc(af, 20);
+    require(stroke.size() == 20, "stroke_from_arc: wrong count");
+    require(close(stroke.front().position.x, 80, 1),
+            "stroke_from_arc: start.x off");
+    require(close(stroke.back().position.x, 20, 1),
+            "stroke_from_arc: end.x off");
+}
+
 void test_fit_star() {
     auto star = make_star(50, 50, 40, 18, 0.0, 12);
     auto sf = quickshape::fit_star(star);
@@ -318,6 +395,12 @@ int main() {
     test_classify_circle();
     test_classify_rectangle();
     test_classify_fallback();
+    test_fit_arc();
+    test_fit_arc_quarter();
+    test_fit_arc_with_jitter();
+    test_classify_arc();
+    test_arc_reject_straight_line();
+    test_stroke_from_arc();
     test_fit_star();
     test_fit_star_rotated();
     test_fit_star_with_jitter();

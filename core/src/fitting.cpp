@@ -146,6 +146,71 @@ LineFit fit_line(const Stroke& input) {
     return result;
 }
 
+// --- Arc fitting (circular arc for open strokes) ---
+
+ArcFit fit_arc(const Stroke& input) {
+    ArcFit result;
+    if (input.size() < 5) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    auto cf = fit_circle(input);
+    if (cf.radius < 1e-6 || cf.residual >= std::numeric_limits<double>::max()) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    result.center = cf.center;
+    result.radius = cf.radius;
+
+    double start_angle = std::atan2(input.front().position.y - cf.center.y,
+                                    input.front().position.x - cf.center.x);
+    double end_angle = std::atan2(input.back().position.y - cf.center.y,
+                                  input.back().position.x - cf.center.x);
+
+    // Determine winding direction from the stroke samples
+    double cross_sum = 0;
+    for (std::size_t i = 1; i < input.size(); ++i) {
+        double a_prev = std::atan2(input[i - 1].position.y - cf.center.y,
+                                   input[i - 1].position.x - cf.center.x);
+        double a_curr = std::atan2(input[i].position.y - cf.center.y,
+                                   input[i].position.x - cf.center.x);
+        double diff = a_curr - a_prev;
+        if (diff > M_PI) diff -= 2.0 * M_PI;
+        if (diff < -M_PI) diff += 2.0 * M_PI;
+        cross_sum += diff;
+    }
+    bool ccw = cross_sum > 0;
+
+    // Adjust end_angle so the arc sweeps in the correct direction
+    if (ccw) {
+        while (end_angle < start_angle) end_angle += 2.0 * M_PI;
+    } else {
+        while (end_angle > start_angle) end_angle -= 2.0 * M_PI;
+    }
+
+    result.start_angle = start_angle;
+    result.end_angle = end_angle;
+
+    // Reject arcs that span nearly a full circle or are too small
+    double sweep = std::abs(end_angle - start_angle);
+    if (sweep > 1.9 * M_PI || sweep < 0.15) {
+        result.residual = std::numeric_limits<double>::max();
+        return result;
+    }
+
+    // Compute residual: distance from each sample to the ideal arc
+    double err_sum = 0;
+    for (const auto& s : input) {
+        double d = std::abs(distance(s.position, cf.center) - cf.radius);
+        err_sum += d;
+    }
+    result.residual = err_sum / static_cast<double>(input.size());
+
+    return result;
+}
+
 // --- Circle fitting (Kåsa algebraic) ---
 
 CircleFit fit_circle(const Stroke& input) {
@@ -531,6 +596,22 @@ Stroke stroke_from_line(const LineFit& fit, std::size_t sample_count) {
     return s;
 }
 
+Stroke stroke_from_arc(const ArcFit& fit, std::size_t sample_count) {
+    Stroke s;
+    if (sample_count < 2) sample_count = 32;
+    s.reserve(sample_count);
+    for (std::size_t i = 0; i < sample_count; ++i) {
+        double t = static_cast<double>(i) /
+                   static_cast<double>(sample_count - 1);
+        double angle = fit.start_angle + t * (fit.end_angle - fit.start_angle);
+        Sample sam;
+        sam.position.x = fit.center.x + fit.radius * std::cos(angle);
+        sam.position.y = fit.center.y + fit.radius * std::sin(angle);
+        s.push_back(sam);
+    }
+    return s;
+}
+
 Stroke stroke_from_circle(const CircleFit& fit, std::size_t sample_count) {
     Stroke s;
     if (sample_count < 4) sample_count = 64;
@@ -657,6 +738,20 @@ ClassifyResult classify(const Stroke& input, const ClassifyOptions& options) {
             best.confidence = conf;
             best.line = lf;
             best.fitted_path = stroke_from_line(lf, input.size());
+        }
+    }
+
+    // Arc (open strokes only — competes with line)
+    if (!closed) {
+        auto af = fit_arc(input);
+        if (af.residual < std::numeric_limits<double>::max()) {
+            double conf = score(af.residual);
+            if (conf > best.confidence) {
+                best.type = ShapeType::Arc;
+                best.confidence = conf;
+                best.arc = af;
+                best.fitted_path = stroke_from_arc(af, input.size());
+            }
         }
     }
 

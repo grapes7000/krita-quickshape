@@ -14,7 +14,7 @@ An early-stage, testable project scaffold for a unified Krita drawing tool that 
 2. Draw normally with a tablet pen.
 3. Lift immediately to keep ordinary freehand output.
 4. Hold briefly at the end to preview and commit a cleaned stroke.
-5. Clear shapes may snap to a line, curve, circle, ellipse, triangle, rectangle, polygon, or five-point star; uncertain strokes receive general smoothing instead.
+5. Clear shapes may snap to a line, arc, circle, ellipse, triangle, rectangle, polygon, or five-point star; uncertain strokes receive general smoothing instead.
 
 The tool must remain a single drawing mode. It must not require switching among Krita's separate shape tools.
 
@@ -52,7 +52,7 @@ Or run:
 
 ## Current scope
 
-The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
+The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, arcs, circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
 
 The `krita_5_3_3` adapter loads into the official Krita 5.3.3 AppImage and performs stroke capture, hold detection, cancellation, and corrected-path replay through the active brush preset. Shape recognition (Gate 3/4) is implemented in the core and being integrated into the live tool. Currently debugging and optimizing the correction flow.
 

@@ -41,7 +41,7 @@ Status: implemented and tested. Star recognition deferred to Gate 4.
 - [x] Ellipse fitting (covariance-axis estimation).
 - [x] Triangle, rectangle, and general polygon (RDP simplification).
 - [x] Confidence scoring with safe fallback to None.
-- [ ] Open smooth curve fitting (spline-based, not yet implemented).
+- [x] Arc fitting (circular arc for open strokes).
 
 ## Gate 4 — Five-point stars
 
@@ -62,8 +62,8 @@ correction flow. Shape recognition integration (Gates 3/4) in progress.
 - [x] Tool registers and loads in Krita 5.3.3 AppImage.
 - [x] Stroke capture, hold detection, and cancellation working.
 - [x] Corrected-path replay through active brush preset.
-- [ ] Shape recognition integration (line, circle, ellipse, polygon, star).
-- [ ] Arc fitting (open curved segment — Procreate has this, we don't).
+- [ ] Shape recognition integration (line, arc, circle, ellipse, polygon, star).
+- [x] Arc fitting (open curved segment — circular arc for open strokes).
 - [ ] Configurable hold delay (100–1500ms) in Tool Options.
 - [ ] Post-snap drag interaction (scale/rotate while pen is still down).
 - [ ] Perfect-form modifier (Shift → circle/square/equilateral).

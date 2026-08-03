@@ -42,14 +42,14 @@ cleanly elliptical fall back to straight-line polyline segments.
 
 ### Our implementation
 
-Recognized: line, circle, ellipse, triangle, rectangle, general polygon,
+Recognized: line, arc, circle, ellipse, triangle, rectangle, general polygon,
 five-point star. Confidence-based classifier with `ShapeType::None` fallback
 that applies general corner-aware smoothing.
 
 ### Gap
 
-- **Missing: arc fitting** (open curved segment — portion of an ellipse).
-  Procreate's most common correction for single curved strokes.
+- Arc fitting implemented (circular arc for open strokes). Elliptical arc
+  fitting could be added later but circular arcs cover the most common case.
 - Our smoothing fallback when no shape matches is BETTER than Procreate, which
   has no smoothing fallback at all.
 - Stars are a bonus shape Procreate doesn't have.
@@ -261,7 +261,7 @@ philosophy.
 | Priority | Feature | Procreate has it | We have it | Difficulty |
 |----------|---------|:---:|:---:|:---:|
 | 1 | Configurable hold delay | Yes | Partial | Easy |
-| 2 | Arc fitting | Yes | No | Medium |
+| 2 | Arc fitting | Yes | Yes | Done |
 | 3 | Post-snap drag interaction | Yes | No | Hard |
 | 4 | Perfect-form modifier (Shift) | Yes | No | Medium |
 | 5 | 15° rotation snapping | Yes | No | Easy |

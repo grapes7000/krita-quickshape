@@ -10,6 +10,7 @@ namespace quickshape {
 enum class ShapeType : std::uint8_t {
     None,
     Line,
+    Arc,
     Circle,
     Ellipse,
     Triangle,
@@ -51,6 +52,14 @@ struct StarFit {
     double residual{};
 };
 
+struct ArcFit {
+    Point center{};
+    double radius{};
+    double start_angle{};
+    double end_angle{};
+    double residual{};
+};
+
 struct ClassifyOptions {
     double confidence_threshold{0.85};
     double closure_distance_ratio{0.10};
@@ -62,6 +71,7 @@ struct ClassifyResult {
     ShapeType type{ShapeType::None};
     double confidence{};
     LineFit line;
+    ArcFit arc;
     CircleFit circle;
     EllipseFit ellipse;
     PolygonFit polygon;
@@ -72,6 +82,7 @@ struct ClassifyResult {
 // --- Individual fitters ---
 
 [[nodiscard]] LineFit fit_line(const Stroke& input);
+[[nodiscard]] ArcFit fit_arc(const Stroke& input);
 [[nodiscard]] CircleFit fit_circle(const Stroke& input);
 [[nodiscard]] EllipseFit fit_ellipse(const Stroke& input);
 [[nodiscard]] StarFit fit_star(const Stroke& input);
@@ -87,6 +98,8 @@ struct ClassifyResult {
 
 [[nodiscard]] Stroke stroke_from_line(const LineFit& fit,
                                       std::size_t sample_count);
+[[nodiscard]] Stroke stroke_from_arc(const ArcFit& fit,
+                                     std::size_t sample_count);
 [[nodiscard]] Stroke stroke_from_circle(const CircleFit& fit,
                                         std::size_t sample_count);
 [[nodiscard]] Stroke stroke_from_ellipse(const EllipseFit& fit,
