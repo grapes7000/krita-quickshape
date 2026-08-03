@@ -6,6 +6,7 @@ include(CTest)
 add_library(quickshape_core
     core/src/host_contract.cpp
     core/src/stroke.cpp
+    core/src/fitting.cpp
 )
 target_include_directories(quickshape_core PUBLIC core/include)
 target_compile_features(quickshape_core PUBLIC cxx_std_20)
@@ -20,6 +21,10 @@ if(BUILD_TESTING)
     add_executable(stroke_test tests/stroke_test.cpp)
     target_link_libraries(stroke_test PRIVATE quickshape_core)
     add_test(NAME stroke_test COMMAND stroke_test)
+
+    add_executable(fitting_test tests/fitting_test.cpp)
+    target_link_libraries(fitting_test PRIVATE quickshape_core)
+    add_test(NAME fitting_test COMMAND fitting_test)
 
     add_executable(host_contract_test tests/host_contract_test.cpp)
     target_link_libraries(host_contract_test PRIVATE quickshape_core)

@@ -35,10 +35,14 @@ Status: core algorithms implemented and tested. Benchmarks deferred.
 
 ## Gate 3 — Primitive recognition
 
-- Line and open curve.
-- Circle and ellipse.
-- Triangle, square, rectangle, and general polygon.
-- Confidence scoring with safe fallback.
+Status: implemented and tested. Star recognition deferred to Gate 4.
+
+- [x] Line fitting (PCA-based).
+- [x] Circle fitting (Kåsa algebraic).
+- [x] Ellipse fitting (covariance-axis estimation).
+- [x] Triangle, rectangle, and general polygon (RDP simplification).
+- [x] Confidence scoring with safe fallback to None.
+- [ ] Open smooth curve fitting (spline-based, not yet implemented).
 
 ## Gate 4 — Five-point stars
 

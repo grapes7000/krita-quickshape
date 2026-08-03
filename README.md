@@ -51,7 +51,7 @@ Or run:
 
 ## Current scope
 
-The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
+The geometry core implements deduplication, arc-length resampling, corner detection, corner-aware smoothing, pressure/sensor remapping by normalized arc length, and a version-neutral stroke/transaction lifecycle contract. The fitting module recognizes lines, circles, ellipses, triangles, rectangles, general polygons, and five-point stars with confidence scoring and safe fallback for ambiguous strokes. All algorithms are host-independent (no Qt/Krita dependency) and covered by unit tests.
 
 Read-only research rejects Python and identifies a conditional native C++ route through a `krita_5_3_3` adapter. The official artifacts are verified and their private API/ABI inspected, but the interactive proof remains blocked by missing matching Qt5/KF5 development headers and a disconnected Wacom device. This code is deliberately not presented as a working plugin.
 
