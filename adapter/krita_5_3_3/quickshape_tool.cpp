@@ -13,6 +13,8 @@
 #include <kundo2magicstring.h>
 #include <KoIcon.h>
 
+#include "quickshape/fitting.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -205,14 +207,31 @@ void QuickShapeTool::qualifyEndpointHold() {
     const quickshape::Stroke deduplicated = quickshape::deduplicate(
         roughStroke, {.min_distance = 0.5});
     const std::size_t replaySampleCount =
-        std::clamp<std::size_t>(deduplicated.size(), 2, 256);
+        std::clamp<std::size_t>(deduplicated.size(), 2, 512);
     const quickshape::Stroke resampled = quickshape::resample_by_arc_length(
         deduplicated, {.target_count = replaySampleCount});
     const auto corners = quickshape::detect_corners(
         resampled, {.angle_threshold_deg = 25.0, .neighborhood = 3});
-    const quickshape::Stroke corrected =
-        quickshape::smooth_positions_preserve_corners(
-            resampled, corners, {.radius = 2});
+
+    // Try shape recognition first; fall back to adaptive smoothing
+    const auto classification = quickshape::classify(
+        resampled, {.confidence_threshold = 0.85});
+
+    quickshape::Stroke corrected;
+    if (classification.type != quickshape::ShapeType::None) {
+        corrected = classification.fitted_path;
+        qInfo().noquote() << "QuickShape: recognized shape type"
+                          << static_cast<int>(classification.type)
+                          << "confidence" << classification.confidence;
+    } else {
+        corrected = quickshape::smooth_adaptive(
+            resampled, corners,
+            {.base_sigma = 3.0, .passes = 2,
+             .curvature_preservation = 0.7});
+        qInfo().noquote() << "QuickShape: no shape recognized, "
+                             "adaptive smoothing applied";
+    }
+
     const quickshape::Stroke replayStroke =
         quickshape::remap_sensors(corrected, roughStroke);
 
@@ -249,9 +268,17 @@ void QuickShapeTool::requestStrokeCancellation() {
 }
 
 void QuickShapeTool::requestStrokeEnd() {
+    holdTimer_.stop();
     if (helper_->hasRunningStroke()) {
-        cancelCapture(quickshape::Interruption::node_changed);
+        endStroke();
+        if (auto* canvas2 = dynamic_cast<KisCanvas2*>(canvas())) {
+            canvas2->viewManager()->enableControls();
+        }
+        setMode(KisTool::HOVER_MODE);
     }
+    lifecycle_.finish();
+    replacementRunning_ = false;
+    inputCancelled_ = false;
 }
 
 void QuickShapeTool::deactivate() {
